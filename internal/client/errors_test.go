@@ -94,10 +94,10 @@ func TestAPIError(t *testing.T) {
 func TestConnectionError(t *testing.T) {
 	t.Run("with wrapped error", func(t *testing.T) {
 		innerErr := errors.New("connection refused")
-		err := NewConnectionError("failed to connect", innerErr)
+		err := NewConnectionError("192.168.1.100", innerErr)
 
-		if err.Message != "failed to connect" {
-			t.Errorf("ConnectionError.Message = %v, want 'failed to connect'", err.Message)
+		if err.Host != "192.168.1.100" {
+			t.Errorf("ConnectionError.Host = %v, want '192.168.1.100'", err.Host)
 		}
 		if err.Err != innerErr {
 			t.Errorf("ConnectionError.Err = %v, want %v", err.Err, innerErr)
@@ -106,27 +106,47 @@ func TestConnectionError(t *testing.T) {
 			t.Error("errors.Is failed to match wrapped error")
 		}
 
-		expectedMsg := "connection error: failed to connect: connection refused"
-		if err.Error() != expectedMsg {
-			t.Errorf("ConnectionError.Error() = %v, want %v", err.Error(), expectedMsg)
+		// Check that error message contains key information
+		errMsg := err.Error()
+		if !contains(errMsg, "192.168.1.100") {
+			t.Errorf("ConnectionError.Error() should contain host")
+		}
+		if !contains(errMsg, "connection refused") {
+			t.Errorf("ConnectionError.Error() should contain underlying error")
+		}
+		if !contains(errMsg, "provider \"trueform\"") {
+			t.Errorf("ConnectionError.Error() should contain example configuration")
 		}
 	})
 
 	t.Run("without wrapped error", func(t *testing.T) {
-		err := NewConnectionError("timeout", nil)
+		err := NewConnectionError("truenas.local", nil)
 
-		if err.Message != "timeout" {
-			t.Errorf("ConnectionError.Message = %v, want 'timeout'", err.Message)
+		if err.Host != "truenas.local" {
+			t.Errorf("ConnectionError.Host = %v, want 'truenas.local'", err.Host)
 		}
 		if err.Err != nil {
 			t.Errorf("ConnectionError.Err = %v, want nil", err.Err)
 		}
 
-		expectedMsg := "connection error: timeout"
-		if err.Error() != expectedMsg {
-			t.Errorf("ConnectionError.Error() = %v, want %v", err.Error(), expectedMsg)
+		errMsg := err.Error()
+		if !contains(errMsg, "truenas.local") {
+			t.Errorf("ConnectionError.Error() should contain host")
 		}
 	})
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
+}
+
+func containsHelper(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func TestNewAPIError(t *testing.T) {

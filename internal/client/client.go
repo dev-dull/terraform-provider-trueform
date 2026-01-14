@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -15,7 +16,7 @@ import (
 )
 
 const (
-	defaultTimeout     = 30 * time.Second
+	defaultTimeout     = 10 * time.Second
 	defaultPingPeriod  = 30 * time.Second
 	defaultPongTimeout = 60 * time.Second
 	maxReconnectDelay  = 30 * time.Second
@@ -78,9 +79,9 @@ func NewClient(cfg *Config) *Client {
 // Connect establishes a WebSocket connection and authenticates
 func (c *Client) Connect(ctx context.Context) error {
 	c.connMu.Lock()
-	defer c.connMu.Unlock()
 
 	if c.isConnected() {
+		c.connMu.Unlock()
 		return nil
 	}
 
@@ -96,16 +97,30 @@ func (c *Client) Connect(ctx context.Context) error {
 		InsecureSkipVerify: !c.verifySSL,
 	}
 
+	// Create a net.Dialer with explicit timeouts to ensure TCP connection attempts timeout
+	netDialer := &net.Dialer{
+		Timeout:   c.timeout,
+		KeepAlive: 30 * time.Second,
+	}
+
 	dialer := websocket.Dialer{
 		TLSClientConfig:  tlsConfig,
 		HandshakeTimeout: c.timeout,
+		NetDialContext:   netDialer.DialContext,
 	}
 
+	// Create a context with timeout for the connection attempt
+	connectCtx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
 	// Connect
-	conn, _, err := dialer.DialContext(ctx, u.String(), http.Header{})
+	conn, _, err := dialer.DialContext(connectCtx, u.String(), http.Header{})
 	if err != nil {
-		return NewConnectionError("failed to connect to TrueNAS", err)
+		return NewConnectionError(c.host, err)
 	}
+
+	// Set initial read deadline
+	conn.SetReadDeadline(time.Now().Add(c.timeout))
 
 	c.conn = conn
 	c.setConnected(true)
@@ -114,9 +129,14 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.wg.Add(1)
 	go c.readResponses()
 
+	// Release the lock before calling authenticate, which calls Call(), which needs the lock
+	c.connMu.Unlock()
+
 	// Authenticate with API key
 	if err := c.authenticate(ctx); err != nil {
+		c.connMu.Lock()
 		c.close()
+		c.connMu.Unlock()
 		return err
 	}
 
@@ -138,6 +158,7 @@ func (c *Client) authenticate(ctx context.Context) error {
 
 // Call makes a JSON-RPC call and waits for the response
 func (c *Client) Call(ctx context.Context, method string, params interface{}, result interface{}) error {
+
 	// Ensure we're connected
 	if !c.isConnected() {
 		if err := c.Connect(ctx); err != nil {
@@ -163,13 +184,14 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}, re
 	// Build request
 	req := NewRequest(id, method, params)
 
-	// Send request
+	// Send request with write deadline
 	c.connMu.Lock()
+	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
 	err := c.conn.WriteJSON(req)
 	c.connMu.Unlock()
 
 	if err != nil {
-		return NewConnectionError("failed to send request", err)
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 
 	// Wait for response with timeout
@@ -187,13 +209,15 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}, re
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-time.After(c.timeout):
-		return fmt.Errorf("request timeout")
+		return fmt.Errorf("request timeout after %v", c.timeout)
 	}
 }
 
 // readResponses reads responses from the WebSocket connection
 func (c *Client) readResponses() {
-	defer c.wg.Done()
+	defer func() {
+		c.wg.Done()
+	}()
 
 	for {
 		select {
@@ -216,15 +240,40 @@ func (c *Client) readResponses() {
 				c.setConnected(false)
 				return
 			}
-			// Connection error - mark as disconnected
+			// Check if it's a timeout - if so, check if we should continue
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				// Check if context is cancelled
+				select {
+				case <-c.ctx.Done():
+					return
+				default:
+					// Refresh deadline and continue
+					c.connMu.Lock()
+					if c.conn != nil {
+						c.conn.SetReadDeadline(time.Now().Add(c.timeout))
+					}
+					c.connMu.Unlock()
+					continue
+				}
+			}
+			// Other connection error - mark as disconnected
 			c.setConnected(false)
 			return
 		}
+
+
+		// Successfully read a response - refresh deadline for next read
+		c.connMu.Lock()
+		if c.conn != nil {
+			c.conn.SetReadDeadline(time.Now().Add(c.timeout))
+		}
+		c.connMu.Unlock()
 
 		// Route response to waiting caller
 		c.responsesMu.Lock()
 		if ch, ok := c.responses[resp.ID]; ok {
 			ch <- &resp
+		} else {
 		}
 		c.responsesMu.Unlock()
 	}

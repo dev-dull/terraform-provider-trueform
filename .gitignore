@@ -3,4 +3,5 @@
 **/mcp.json
 **/sessions/
 **/history/
-
+**/creds
+local-test/

@@ -50,15 +50,31 @@ func (e *APIError) IsValidationError() bool {
 
 // ConnectionError represents a connection-related error
 type ConnectionError struct {
-	Message string
-	Err     error
+	Host string
+	Err  error
 }
 
 func (e *ConnectionError) Error() string {
-	if e.Err != nil {
-		return fmt.Sprintf("connection error: %s: %v", e.Message, e.Err)
-	}
-	return fmt.Sprintf("connection error: %s", e.Message)
+	return fmt.Sprintf(`failed to connect to TrueNAS at %q: %v
+
+Please verify:
+  1. The host is reachable (try: curl -k https://%s/api/current)
+  2. TrueNAS Scale 25.04+ is running and the API is enabled
+  3. Your provider configuration is correct
+
+Example configuration:
+
+  provider "trueform" {
+    host       = "192.168.1.100"    # TrueNAS IP or hostname
+    api_key    = "1-xxxx..."        # API key from TrueNAS UI
+    verify_ssl = false              # Set true if using valid SSL cert
+  }
+
+Or use environment variables:
+  export TRUENAS_HOST="192.168.1.100"
+  export TRUENAS_API_KEY="1-xxxx..."
+  export TRUENAS_VERIFY_SSL="false"
+`, e.Host, e.Err, e.Host)
 }
 
 func (e *ConnectionError) Unwrap() error {
@@ -79,10 +95,10 @@ func NewAPIError(rpcErr *JSONRPCError) *APIError {
 }
 
 // NewConnectionError creates a new ConnectionError
-func NewConnectionError(message string, err error) *ConnectionError {
+func NewConnectionError(host string, err error) *ConnectionError {
 	return &ConnectionError{
-		Message: message,
-		Err:     err,
+		Host: host,
+		Err:  err,
 	}
 }
 
