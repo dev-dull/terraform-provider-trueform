@@ -44,6 +44,8 @@ builds:
         goarch: arm64
       - goos: freebsd
         goarch: arm64
+      - goos: freebsd
+        goarch: arm
     binary: "{{ .ProjectName }}_v{{ .Version }}"
 
 archives:
