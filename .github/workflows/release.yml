@@ -21,6 +21,11 @@ on:
     tags:
       - "v*"
 
+# Prevent concurrent releases from interfering with each other
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -50,7 +55,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
-          cache: true
+          cache: false  # Disable cache for releases to ensure clean builds
+
+      - name: Clean workspace
+        run: rm -rf dist/
 
       - name: Import GPG key
         id: import_gpg
