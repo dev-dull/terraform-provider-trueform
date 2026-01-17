@@ -313,7 +313,7 @@ func (r *ShareNFSResource) Update(ctx context.Context, req resource.UpdateReques
 		}
 	}
 	if !plan.Networks.Equal(state.Networks) {
-		var networks []string
+		networks := []string{}
 		if !plan.Networks.IsNull() {
 			diags = plan.Networks.ElementsAs(ctx, &networks, false)
 			resp.Diagnostics.Append(diags...)
@@ -321,7 +321,7 @@ func (r *ShareNFSResource) Update(ctx context.Context, req resource.UpdateReques
 		updateData["networks"] = networks
 	}
 	if !plan.Hosts.Equal(state.Hosts) {
-		var hosts []string
+		hosts := []string{}
 		if !plan.Hosts.IsNull() {
 			diags = plan.Hosts.ElementsAs(ctx, &hosts, false)
 			resp.Diagnostics.Append(diags...)
@@ -430,13 +430,15 @@ func (r *ShareNFSResource) readShare(ctx context.Context, id int64, model *Share
 			model.Aliases = aliasValues
 		}
 	}
-	if comment, ok := result["comment"].(string); ok {
+	if comment, ok := result["comment"].(string); ok && comment != "" {
 		model.Comment = types.StringValue(comment)
+	} else if model.Comment.IsUnknown() {
+		model.Comment = types.StringNull()
 	}
 	if enabled, ok := result["enabled"].(bool); ok {
 		model.Enabled = types.BoolValue(enabled)
 	}
-	if networks, ok := result["networks"].([]interface{}); ok {
+	if networks, ok := result["networks"].([]interface{}); ok && len(networks) > 0 {
 		networkList := make([]string, len(networks))
 		for i, n := range networks {
 			networkList[i] = n.(string)
@@ -445,6 +447,8 @@ func (r *ShareNFSResource) readShare(ctx context.Context, id int64, model *Share
 		if !diags.HasError() {
 			model.Networks = networkValues
 		}
+	} else if model.Networks.IsUnknown() {
+		model.Networks = types.ListNull(types.StringType)
 	}
 	if hosts, ok := result["hosts"].([]interface{}); ok {
 		hostList := make([]string, len(hosts))

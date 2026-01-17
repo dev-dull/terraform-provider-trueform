@@ -392,13 +392,13 @@ func (r *ShareSMBResource) Update(ctx context.Context, req resource.UpdateReques
 		updateData["enabled"] = plan.Enabled.ValueBool()
 	}
 	if !plan.Home.Equal(state.Home) {
-		updateData["home"] = plan.Home.ValueBool()
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'home' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
 	}
 	if !plan.Purpose.Equal(state.Purpose) {
 		updateData["purpose"] = plan.Purpose.ValueString()
 	}
 	if !plan.TimeMachine.Equal(state.TimeMachine) {
-		updateData["timemachine"] = plan.TimeMachine.ValueBool()
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'timemachine' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
 	}
 	// Note: In TrueNAS Scale 25, certain SMB fields cannot be updated after creation
 	// ro, browsable, recyclebin, guestok, abe must be set at creation time
@@ -417,6 +417,21 @@ func (r *ShareSMBResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 	if !plan.Guestok.Equal(state.Guestok) {
 		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'guestok' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
+	}
+	if !plan.Acl.Equal(state.Acl) {
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'acl' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
+	}
+	if !plan.Durablehandle.Equal(state.Durablehandle) {
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'durablehandle' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
+	}
+	if !plan.Shadowcopy.Equal(state.Shadowcopy) {
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'shadowcopy' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
+	}
+	if !plan.Streams.Equal(state.Streams) {
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'streams' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
+	}
+	if !plan.Fsrvp.Equal(state.Fsrvp) {
+		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'fsrvp' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
 	}
 	if !plan.HostsAllow.Equal(state.HostsAllow) {
 		var hosts []string
@@ -441,22 +456,8 @@ func (r *ShareSMBResource) Update(ctx context.Context, req resource.UpdateReques
 			updateData["auxsmbconf"] = plan.AuxSMBConf.ValueString()
 		}
 	}
-	if !plan.Acl.Equal(state.Acl) {
-		updateData["acl"] = plan.Acl.ValueBool()
-	}
-	if !plan.Durablehandle.Equal(state.Durablehandle) {
-		updateData["durablehandle"] = plan.Durablehandle.ValueBool()
-	}
-	if !plan.Shadowcopy.Equal(state.Shadowcopy) {
-		updateData["shadowcopy"] = plan.Shadowcopy.ValueBool()
-	}
-	if !plan.Streams.Equal(state.Streams) {
-		updateData["streams"] = plan.Streams.ValueBool()
-	}
-	if !plan.Fsrvp.Equal(state.Fsrvp) {
-		updateData["fsrvp"] = plan.Fsrvp.ValueBool()
-	}
-	// Note: audit_logging is not supported in TrueNAS Scale 25
+	// Note: acl, durablehandle, shadowcopy, streams, fsrvp, and audit_logging
+	// cannot be updated after creation in TrueNAS Scale 25
 
 	if len(updateData) > 0 {
 		var result map[string]interface{}
@@ -530,8 +531,10 @@ func (r *ShareSMBResource) readShare(ctx context.Context, id int64, model *Share
 	if pathSuffix, ok := result["path_suffix"].(string); ok && pathSuffix != "" {
 		model.PathSuffix = types.StringValue(pathSuffix)
 	}
-	if comment, ok := result["comment"].(string); ok {
+	if comment, ok := result["comment"].(string); ok && comment != "" {
 		model.Comment = types.StringValue(comment)
+	} else if model.Comment.IsUnknown() {
+		model.Comment = types.StringNull()
 	}
 	if enabled, ok := result["enabled"].(bool); ok {
 		model.Enabled = types.BoolValue(enabled)
