@@ -1,0 +1,39 @@
+# =============================================================================
+# Trueform Provider Test Suite - Modify Example Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values.
+# Do not commit terraform.tfvars to version control!
+#
+# IMPORTANT: Use the same values as the 'create' configuration for:
+# - truenas_host, truenas_api_key
+# - test_prefix, pool_name, base_path
+# - static_route_destination, static_route_gateway
+#
+# This ensures the 'modify' configuration updates the same resources.
+# =============================================================================
+
+# Provider Configuration
+truenas_host       = "192.168.1.100"      # Your TrueNAS IP or hostname
+truenas_api_key    = "your-api-key-here"  # API key from TrueNAS
+truenas_verify_ssl = false                # Set to true if using valid SSL cert
+
+# Test Configuration (must match 'create' values)
+test_prefix = "tftest"                    # Prefix for all test resources
+pool_name   = "tank"                      # Name of existing pool to use
+base_path   = "/mnt/tank"                 # Base path for datasets/shares
+
+# Network Configuration
+iscsi_listen_ip = "0.0.0.0"               # iSCSI portal listen IP
+
+# NFS Networks - now multiple networks to test update
+nfs_allowed_networks = [
+  "192.168.1.0/24",
+  "192.168.2.0/24",
+]
+
+# Static Route Configuration (must match 'create' values)
+static_route_destination = "10.99.99.0/24"
+static_route_gateway     = "192.168.1.1"
+
+# User Configuration - different password to test password update
+test_user_password = "UpdatedPassword456!"

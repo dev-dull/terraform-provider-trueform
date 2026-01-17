@@ -1,0 +1,25 @@
+# =============================================================================
+# Trueform Provider Test Suite - Example Variables
+# =============================================================================
+# Copy this file to terraform.tfvars and fill in your values.
+# Do not commit terraform.tfvars to version control!
+# =============================================================================
+
+# Provider Configuration
+truenas_host       = "192.168.1.100"      # Your TrueNAS IP or hostname
+truenas_api_key    = "your-api-key-here"  # API key from TrueNAS
+truenas_verify_ssl = false                # Set to true if using valid SSL cert
+
+# Test Configuration
+test_prefix = "tftest"                    # Prefix for all test resources
+pool_name   = "tank"                      # Name of existing pool to use
+base_path   = "/mnt/tank"                 # Base path for datasets/shares
+
+# Network Configuration
+iscsi_listen_ip          = "0.0.0.0"           # iSCSI portal listen IP
+nfs_allowed_network      = "192.168.1.0/24"    # Network allowed to access NFS
+static_route_destination = "10.99.99.0/24"     # Test route destination
+static_route_gateway     = "192.168.1.1"       # Gateway for test route
+
+# User Configuration
+test_user_password = "SecureTestPassword123!"  # Password for test user

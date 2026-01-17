@@ -1,0 +1,120 @@
+# =============================================================================
+# CI Workflow - Build and Test
+# =============================================================================
+# This workflow runs on pull requests and pushes to main to ensure code quality.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Test
+        run: go test -v ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+
+  # Validates Terraform configurations in examples and test directories
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Build Provider
+        run: go build -o terraform-provider-trueform
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Create dev override
+        run: |
+          mkdir -p ~/.terraform.d
+          cat > ~/.terraformrc << EOF
+          provider_installation {
+            dev_overrides {
+              "registry.terraform.io/trueform/trueform" = "${{ github.workspace }}"
+            }
+            direct {}
+          }
+          EOF
+
+      - name: Validate test-resources/create
+        run: |
+          cd test-resources/create
+          terraform validate
+        continue-on-error: true
+
+      - name: Validate test-resources/modify
+        run: |
+          cd test-resources/modify
+          terraform validate
+        continue-on-error: true
+
+  # Checks that GoReleaser configuration is valid
+  goreleaser-check:
+    name: GoReleaser Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Check GoReleaser config
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check

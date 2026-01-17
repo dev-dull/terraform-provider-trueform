@@ -7,9 +7,6 @@
 local-test/
 
 # Terraform test resources
-test-resources/**/terraform.tfvars
-test-resources/**/.terraform/
-test-resources/**/terraform.tfstate
-test-resources/**/terraform.tfstate.backup
-test-resources/**/.terraform.lock.hcl
-cmd/**
+test-resources/terraform.tfvars
+**/*.tfstate*
+cmd/
