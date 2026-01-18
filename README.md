@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo.svg" alt="TrueForm Logo" width="200">
+</p>
+
 # TrueForm
 
 A Terraform provider for managing TrueNAS Scale 25.04+ resources.
