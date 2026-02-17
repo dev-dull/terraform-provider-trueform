@@ -1,13 +1,8 @@
 # =============================================================================
-# Import Blocks - Import existing TrueNAS resources into Terraform state
+# Import Blocks - Import all resources created by the 'create' configuration
 # =============================================================================
-# These import blocks allow Terraform to adopt existing resources that were
-# created by the 'create' configuration.
-#
-# After running 'terraform apply' in the 'create' directory, note the IDs of
-# all created resources and update the IDs below.
-#
-# Then run 'terraform apply' here to import all resources.
+# Import block IDs must be literal strings (no variables allowed).
+# Update these values after running 'terraform apply' in the 'create' directory.
 # =============================================================================
 
 # Pool
@@ -73,7 +68,7 @@ import {
 # User
 import {
   to = trueform_user.test
-  id = "1"
+  id = "71"
 }
 
 # Cronjob

@@ -71,8 +71,8 @@ resource "trueform_pool" "tank" {
 
 ## Import
 
-Pools can be imported using the pool name:
+Pools can be imported using the pool ID:
 
 ```shell
-terraform import trueform_pool.tank tank
+terraform import trueform_pool.tank 1
 ```

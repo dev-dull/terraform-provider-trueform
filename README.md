@@ -15,7 +15,7 @@ The name TrueForm is taking "form" from Terraform, and "true" from TrueNAS.
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.21 (for building from source)
+- [Go](https://golang.org/doc/install) >= 1.24 (for building from source)
 - TrueNAS Scale 25.04 or later
 
 ## Installation
@@ -23,7 +23,7 @@ The name TrueForm is taking "form" from Terraform, and "true" from TrueNAS.
 ### Building from Source
 
 ```bash
-git clone https://github.com/yourusername/trueform.git
+git clone https://github.com/trueform/terraform-provider-trueform.git
 cd trueform
 go build -o terraform-provider-trueform
 ```
@@ -114,7 +114,7 @@ export TRUENAS_VERIFY_SSL="true"
 resource "trueform_dataset" "media" {
   pool        = "tank"
   name        = "media"
-  compression = "lz4"
+  compression = "LZ4"
   quota       = 1099511627776  # 1TB in bytes
   comments    = "Media storage"
 }

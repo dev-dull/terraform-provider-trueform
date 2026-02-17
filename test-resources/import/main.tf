@@ -2,13 +2,10 @@
 # Trueform Provider Test Suite - Resource Import
 # =============================================================================
 # This configuration imports all resources previously created by the 'create'
-# configuration. Use this to test the provider's import functionality.
+# configuration. Resource definitions match 'create' exactly so that
+# 'terraform plan' after import shows no changes.
 #
-# IMPORTANT: Run 'terraform apply' in the 'create' directory first to create
-# all resources, then run 'terraform apply' here to import them.
-#
-# After a successful import, you can run 'terraform plan' to verify that the
-# imported state matches the resource definitions (no changes should be needed).
+# Test order: create -> import -> modify -> destroy
 # =============================================================================
 
 terraform {
@@ -205,7 +202,7 @@ resource "trueform_static_route" "test" {
 }
 
 # =============================================================================
-# Outputs - Display imported resource information
+# Outputs
 # =============================================================================
 
 output "import_summary" {

@@ -388,9 +388,8 @@ func (r *ShareSMBResource) Update(ctx context.Context, req resource.UpdateReques
 			updateData["comment"] = plan.Comment.ValueString()
 		}
 	}
-	if !plan.Enabled.Equal(state.Enabled) {
-		updateData["enabled"] = plan.Enabled.ValueBool()
-	}
+	// Always include enabled in update - TrueNAS Scale 25 resets it to false if omitted
+	updateData["enabled"] = plan.Enabled.ValueBool()
 	if !plan.Home.Equal(state.Home) {
 		resp.Diagnostics.AddWarning("SMB Field Update Limitation", "The 'home' field cannot be updated after creation in TrueNAS Scale 25. Recreate the share to change this value.")
 	}

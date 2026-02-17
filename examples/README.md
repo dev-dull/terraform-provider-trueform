@@ -149,7 +149,7 @@ See the **[test-resources/](../test-resources/)** directory:
 |-----------|-------------|
 | `test-resources/create/` | Creates one of each resource type |
 | `test-resources/modify/` | Demonstrates resource updates |
-| `test-resources/INTEGRATION_TESTING.md` | Complete testing guide |
+| `test-resources/import/` | Tests resource import |
 
 ## Important Notes
 
