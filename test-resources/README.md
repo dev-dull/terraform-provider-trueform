@@ -1,150 +1,260 @@
-# Trueform Provider Test Suite
+# Integration Testing Guide
 
-This directory contains Terraform configurations to test all resource types in the Trueform provider.
+This directory contains Terraform configurations to test all resource types in the Trueform provider through the complete lifecycle: **create → import → modify → destroy**.
 
 ## Directory Structure
 
 ```
 test-resources/
-├── README.md           # This file
-├── create/             # Creates one of each resource type
+├── README.md                    # This guide
+├── creds                        # Test VM credentials (gitignored)
+├── create/                      # Phase 1: Create all resources
 │   ├── main.tf
 │   ├── variables.tf
 │   ├── outputs.tf
-│   └── terraform.tfvars.example
-├── modify/             # Modifies each resource (tests update operations)
-│   ├── main.tf
+│   └── terraform.tfvars         # Placeholder values (edit for testing)
+├── import/                      # Phase 2: Import all resources
+│   ├── main.tf                  # Mirrors create/main.tf exactly
 │   ├── variables.tf
-│   ├── outputs.tf
-│   └── terraform.tfvars.example
-└── import/             # Imports all resources (tests import functionality)
+│   ├── imports.tf               # Import blocks with literal IDs
+│   └── terraform.tfvars         # Placeholder values (edit for testing)
+└── modify/                      # Phase 3: Update all resources
     ├── main.tf
     ├── variables.tf
-    ├── imports.tf
-    └── terraform.tfvars
+    ├── outputs.tf
+    └── terraform.tfvars         # Placeholder values (edit for testing)
 ```
 
 ## Resources Tested
 
-| Resource Type | Create Test | Modify Test | Import Test |
-|--------------|-------------|-------------|-------------|
-| `trueform_pool` | Creates test pool | N/A | Imports by ID |
-| `trueform_dataset` | Creates dataset with lz4 compression | Changes to gzip, increases quota | Imports by path |
-| `trueform_snapshot` | Creates snapshot | Creates new snapshot (immutable) | Imports by full path |
-| `trueform_share_smb` | Creates SMB share | Enables guest access, read-only | Imports by ID |
-| `trueform_share_nfs` | Creates NFS share with 1 network | Adds networks, sets read-only | Imports by ID |
-| `trueform_iscsi_portal` | Creates iSCSI portal | Updates comment | Imports by ID |
-| `trueform_iscsi_initiator` | Creates initiator with 1 IQN | Adds second IQN | Imports by ID |
-| `trueform_iscsi_target` | Creates iSCSI target | Updates alias | Imports by ID |
-| `trueform_iscsi_extent` | Creates 10MB file extent | Increases to 200MB | Imports by ID |
-| `trueform_iscsi_targetextent` | Maps target to extent, LUN 0 | Changes to LUN 1 | Imports by ID |
-| `trueform_user` | Creates test user | Enables sudo, updates email | Imports by ID |
-| `trueform_cronjob` | Creates disabled daily cronjob | Enables, changes to hourly | Imports by ID |
-| `trueform_static_route` | Creates static route | Updates description | Imports by ID |
+| Resource Type | Create | Import | Modify |
+|--------------|--------|--------|--------|
+| `trueform_pool` | Creates test pool | Imports by ID | Removed from config (destroyed) |
+| `trueform_dataset` | LZ4 compression | Imports by path | Compression → GZIP |
+| `trueform_snapshot` | Creates snapshot | Imports by full path | New snapshot (immutable) |
+| `trueform_share_smb` | Creates SMB share | Imports by ID | Updates comment |
+| `trueform_share_nfs` | 1 network | Imports by ID | Adds networks, sets read-only |
+| `trueform_iscsi_portal` | Creates portal | Imports by ID | Updates comment |
+| `trueform_iscsi_initiator` | 1 IQN | Imports by ID | Adds second IQN |
+| `trueform_iscsi_target` | Creates target | Imports by ID | Updates alias |
+| `trueform_iscsi_extent` | 10MB file extent | Imports by ID | Increases to 200MB |
+| `trueform_iscsi_targetextent` | LUN 0 | Imports by ID | Changes to LUN 1 |
+| `trueform_user` | Creates user | Imports by ID | Updates email, full name |
+| `trueform_cronjob` | Disabled, daily | Imports by ID | Enabled, hourly |
+| `trueform_static_route` | Creates route | Imports by ID | Updates description |
 
 ## Prerequisites
 
-1. A running TrueNAS Scale 25.04+ instance
-2. An API key with appropriate permissions
-3. An existing storage pool
-4. The Trueform provider installed (via dev_overrides or registry)
+### TrueNAS Scale VM
 
-## Usage
+You need a TrueNAS Scale 25.04+ instance. A VM with snapshot capability is recommended for easy state restoration between test runs.
 
-### Step 1: Configure Variables
+- **CPU**: 2+ cores
+- **RAM**: 8GB minimum
+- **Boot disk**: 32GB
+- **Test disks**: 4x 256MB virtual disks (for pool testing)
 
-```bash
-cd create/
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your TrueNAS connection details
+After installation:
+1. Complete the TrueNAS setup wizard
+2. Create an API key: **Credentials > API Keys > Add**
+3. Note the IP address and API key
+4. **Create a VM snapshot** for easy restoration
+
+### Store Credentials
+
+Create a `creds` file (gitignored):
+
+```
+IP: 192.168.1.100
+API_KEY: 1-YourAPIKeyHere...
 ```
 
-### Step 2: Create Resources
+### Provider Dev Override
+
+Build the provider and configure a dev override:
 
 ```bash
-cd create/
-terraform init
-terraform plan
-terraform apply
+cd /path/to/trueform
+go build -o terraform-provider-trueform
+
+cat > ~/.terraformrc << 'EOF'
+provider_installation {
+  dev_overrides {
+    "registry.terraform.io/trueform/trueform" = "/path/to/trueform"
+  }
+  direct {}
+}
+EOF
 ```
 
-### Step 3: Test Modifications
+**Remove the dev_overrides block from `~/.terraformrc` when done testing.**
+
+### Discover Disk Names
+
+Query the TrueNAS API for available disk identifiers:
 
 ```bash
-cd ../modify/
-cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with matching values
-
-# Copy state from create directory
-cp ../create/terraform.tfstate .
-
-terraform plan    # Should show updates, not creates
-terraform apply   # Apply modifications
+curl -k -X POST "https://<HOST>/api/current" \
+  -H "Authorization: Bearer <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"msg":"method","method":"disk.query","params":[[],{"select":["name","size","type"]}]}'
 ```
 
-### Step 4: Test Imports (Alternative to Step 3)
+### Configure Variables
 
-This tests the provider's ability to import existing resources into Terraform state.
+Update `terraform.tfvars` in each subdirectory with your TrueNAS connection details and disk names. The committed files contain placeholder values.
+
+## Test Phases
+
+### Phase 1: Create
 
 ```bash
-cd ../import/
-# Edit terraform.tfvars with your TrueNAS connection details
+cd test-resources/create
+terraform apply -auto-approve
+```
 
-# Get resource IDs from create directory
-cd ../create
-terraform show | grep -E "^\s+id\s+="
-# Note all the IDs and update import/terraform.tfvars
+**Expected**: 13 resources created.
 
+Note the resource IDs in the output — you'll need them for the import phase.
+
+### Phase 2: Import
+
+The import config mirrors `create/main.tf` exactly. After import, `terraform plan` should show no changes.
+
+1. Update `import/imports.tf` with correct resource IDs from the create output:
+   - Pool ID (usually `1`)
+   - User ID (check create output, e.g. `71`)
+   - Dataset ID: `testpool/tftest_dataset`
+   - Snapshot ID: `testpool/tftest_dataset@tftest_snapshot`
+   - All others are typically `1`
+
+   **Note**: Import block `id` values must be literal strings — Terraform does not allow variables in import blocks.
+
+2. Apply and verify:
+
+   ```bash
+   cd test-resources/import
+   terraform apply -auto-approve   # Imports 13 resources
+   terraform plan                   # Should show "No changes"
+   ```
+
+### Phase 3: Modify
+
+1. Copy state from the import directory:
+
+   ```bash
+   cp test-resources/import/terraform.tfstate test-resources/modify/terraform.tfstate
+   ```
+
+2. Apply:
+
+   ```bash
+   cd test-resources/modify
+   terraform apply -auto-approve
+   ```
+
+   **Expected**: 1 added, 11 changed, 2 destroyed.
+   - **1 added**: New snapshot (snapshots are immutable)
+   - **11 changed**: Updated resources
+   - **2 destroyed**: Old snapshot replaced, pool removed from config
+
+### Phase 4: Destroy
+
+```bash
+cd test-resources/modify
+terraform destroy -auto-approve
+terraform state list               # Should be empty
+```
+
+## Complete Test Cycle
+
+```bash
+# Ensure VM is in clean state (restore snapshot if needed)
+
+# Phase 1: Create
+cd test-resources/create
+terraform apply -auto-approve
+
+# Phase 2: Import
 cd ../import
-terraform plan    # Should show imports, not creates
-terraform apply   # Import all resources
-terraform plan    # Should show NO changes (validates import worked correctly)
-```
+# Update imports.tf IDs if needed
+terraform apply -auto-approve
+terraform plan                      # Verify: "No changes"
 
-### Step 5: Clean Up
+# Phase 3: Modify
+cp terraform.tfstate ../modify/terraform.tfstate
+cd ../modify
+terraform apply -auto-approve
 
-```bash
-terraform destroy
+# Phase 4: Destroy
+terraform destroy -auto-approve
+
+# Clean up
+# - Revert terraform.tfvars files to placeholder values
+# - Remove dev_overrides from ~/.terraformrc
+# - Optionally restore VM snapshot for next run
 ```
 
 ## Variables Reference
 
-### Required Variables
+### Required
 
-| Variable | Description |
-|----------|-------------|
-| `truenas_host` | TrueNAS host IP or hostname |
-| `truenas_api_key` | API key for authentication |
-| `pool_name` | Name of existing pool (e.g., "tank") |
-| `base_path` | Base path for resources (e.g., "/mnt/tank") |
-| `nfs_allowed_network` | CIDR for NFS access (create only) |
-| `nfs_allowed_networks` | List of CIDRs for NFS (modify only) |
-| `static_route_gateway` | Gateway IP for static route |
+| Variable | Description | Used In |
+|----------|-------------|---------|
+| `truenas_host` | TrueNAS host IP or hostname | all |
+| `truenas_api_key` | API key for authentication | all |
+| `pool_disks` | List of disk identifiers (e.g., `["xvdb", "xvdc"]`) | create, import |
+| `nfs_allowed_network` | CIDR for NFS access (e.g., `192.168.1.0/24`) | create, import |
+| `nfs_allowed_networks` | List of CIDRs for NFS access | modify |
+| `static_route_gateway` | Gateway IP for static route | all |
 
-### Optional Variables
+### Optional
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `truenas_verify_ssl` | `false` | Verify SSL certificates |
 | `test_prefix` | `"tftest"` | Prefix for resource names |
+| `pool_name` | `"testpool"` | Name of the test pool |
 | `iscsi_listen_ip` | `"0.0.0.0"` | iSCSI portal listen address |
 | `static_route_destination` | `"10.99.99.0/24"` | Test route destination |
-| `test_user_password` | varies | Password for test user |
-
-## Notes
-
-- The test prefix (`tftest` by default) is used for all resource names to avoid conflicts
-- The cronjob is disabled by default in the create configuration for safety
-- Snapshots are immutable, so the modify configuration creates a new snapshot
-- Remember to destroy resources when done testing to clean up
+| `test_user_password` | `"TestPassword123!"` | Password for test user |
 
 ## Troubleshooting
 
-### "Resource already exists" errors
-Ensure you're using the same `test_prefix` and that no conflicting resources exist.
+### "Provider produced inconsistent result after apply"
 
-### State mismatch between create and modify
-Copy `terraform.tfstate` from `create/` to `modify/` before running apply in modify.
+The provider returned different values than expected. Common cause: a field resets to a default when not explicitly included in the update payload (e.g., the SMB `enabled` field on TrueNAS Scale 25). Fix: ensure the provider always sends the field in updates.
 
-### Connection timeouts
-Check that the TrueNAS host is reachable and the API is enabled.
+### Pool destroy cascades
+
+Destroying a pool on TrueNAS destroys all datasets and snapshots within it. The modify config intentionally omits the pool resource, which causes Terraform to destroy it. This is expected.
+
+### Import "Variables may not be used here"
+
+Terraform import blocks require literal strings for the `id` field. Use hardcoded values, not variable references.
+
+### "Resource already exists"
+
+A resource with the same name exists on TrueNAS. Either destroy it manually or restore the VM snapshot.
+
+### Connection timeout
+
+Verify the VM is running, the IP is correct, and the API key is valid:
+
+```bash
+curl -k https://<truenas-ip>/api/current
+```
+
+### State file mismatch
+
+If the state doesn't match TrueNAS reality, either restore the VM snapshot or delete the state files and start over.
+
+## Security
+
+**Never commit real credentials.** The following are gitignored:
+
+- `**/creds` — credential files
+- `**/*.tfstate*` — Terraform state (may contain secrets)
+- `test-resources/terraform.tfvars` — root-level shared variables
+
+The `terraform.tfvars` files in subdirectories are tracked with placeholder values. **Always revert them to placeholders after testing.**
