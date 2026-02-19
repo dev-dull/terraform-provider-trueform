@@ -68,3 +68,21 @@ variable "test_user_password" {
   sensitive   = true
   default     = "TestPassword123!"
 }
+
+variable "test_app_name" {
+  description = "Catalog app to deploy for testing (ix-app is the lightweight custom app)"
+  type        = string
+  default     = "ix-app"
+}
+
+variable "test_app_train" {
+  description = "Catalog train for the test app"
+  type        = string
+  default     = "stable"
+}
+
+variable "test_app_version" {
+  description = "Version of the test app to deploy"
+  type        = string
+  default     = "1.3.4"
+}

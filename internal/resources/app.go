@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -142,8 +144,7 @@ func (r *AppResource) Create(ctx context.Context, req resource.CreateRequest, re
 		createData["values"] = values
 	}
 
-	var result map[string]interface{}
-	err := r.client.Create(ctx, "app", createData, &result)
+	_, err := r.client.CreateWithJob(ctx, "app", createData, 5*time.Minute)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating App", "Could not create app: "+err.Error())
 		return
@@ -210,8 +211,7 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 	}
 
 	if len(updateData) > 0 {
-		var result map[string]interface{}
-		err := r.client.Update(ctx, "app", state.ID.ValueString(), updateData, &result)
+		_, err := r.client.UpdateWithJob(ctx, "app", state.ID.ValueString(), updateData, 5*time.Minute)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Updating App", "Could not update app: "+err.Error())
 			return
@@ -220,14 +220,19 @@ func (r *AppResource) Update(ctx context.Context, req resource.UpdateRequest, re
 
 	// Handle version upgrade
 	if !plan.Version.Equal(state.Version) && !plan.Version.IsNull() {
+		var jobID float64
 		err := r.client.Call(ctx, "app.upgrade", []interface{}{
 			state.ID.ValueString(),
 			map[string]interface{}{
 				"app_version": plan.Version.ValueString(),
 			},
-		}, nil)
+		}, &jobID)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Upgrading App", "Could not upgrade app: "+err.Error())
+			return
+		}
+		if _, err := r.client.WaitForJob(ctx, int64(jobID), 5*time.Minute); err != nil {
+			resp.Diagnostics.AddError("Error Upgrading App", "App upgrade job failed: "+err.Error())
 			return
 		}
 	}
@@ -253,9 +258,14 @@ func (r *AppResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		"name": state.ID.ValueString(),
 	})
 
-	err := r.client.Delete(ctx, "app", state.ID.ValueString())
+	var jobID float64
+	err := r.client.Call(ctx, "app.delete", []interface{}{state.ID.ValueString()}, &jobID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Deleting App", "Could not delete app: "+err.Error())
+		return
+	}
+	if _, err := r.client.WaitForJob(ctx, int64(jobID), 5*time.Minute); err != nil {
+		resp.Diagnostics.AddError("Error Deleting App", "App delete job failed: "+err.Error())
 		return
 	}
 }
@@ -274,14 +284,29 @@ func (r *AppResource) readApp(ctx context.Context, name string, model *AppResour
 	model.ID = types.StringValue(result["id"].(string))
 	model.Name = types.StringValue(result["name"].(string))
 
+	// Read version from top-level field (chart/package version)
+	if version, ok := result["version"].(string); ok {
+		model.Version = types.StringValue(version)
+	}
+
+	// Build metadata map for state
+	metadataMap := map[string]attr.Value{}
+
 	if metadata, ok := result["metadata"].(map[string]interface{}); ok {
 		if appVersion, ok := metadata["app_version"].(string); ok {
-			model.Version = types.StringValue(appVersion)
+			metadataMap["app_version"] = types.StringValue(appVersion)
 		}
 		if train, ok := metadata["train"].(string); ok {
 			model.Train = types.StringValue(train)
+			metadataMap["train"] = types.StringValue(train)
+		}
+		if name, ok := metadata["name"].(string); ok {
+			metadataMap["name"] = types.StringValue(name)
+			model.CatalogApp = types.StringValue(name)
 		}
 	}
+
+	model.Metadata, _ = types.MapValue(types.StringType, metadataMap)
 
 	if state, ok := result["state"].(string); ok {
 		model.State = types.StringValue(state)

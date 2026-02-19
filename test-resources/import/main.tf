@@ -202,6 +202,25 @@ resource "trueform_static_route" "test" {
 }
 
 # =============================================================================
+# App
+# =============================================================================
+
+resource "trueform_app" "test" {
+  name        = "${var.test_prefix}-app"
+  catalog_app = var.test_app_name
+  train       = var.test_app_train
+  version     = var.test_app_version
+  values = jsonencode({
+    image = {
+      repository = "busybox"
+      tag        = "latest"
+      pull_policy = "missing"
+    }
+    command = ["sleep", "3600"]
+  })
+}
+
+# =============================================================================
 # Outputs
 # =============================================================================
 
@@ -221,5 +240,6 @@ output "import_summary" {
     user               = trueform_user.test.username
     cronjob            = trueform_cronjob.test.description
     static_route       = trueform_static_route.test.destination
+    app                = trueform_app.test.name
   }
 }

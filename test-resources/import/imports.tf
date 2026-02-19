@@ -82,3 +82,9 @@ import {
   to = trueform_static_route.test
   id = "1"
 }
+
+# App (imported by name)
+import {
+  to = trueform_app.test
+  id = "tftest-app"
+}

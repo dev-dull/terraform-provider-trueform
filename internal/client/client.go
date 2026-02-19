@@ -209,11 +209,22 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}, re
 
 	// Send request with write deadline
 	c.connMu.Lock()
+	if c.conn == nil {
+		c.connMu.Unlock()
+		// Connection was lost between isConnected() check and here; reconnect
+		c.setConnected(false)
+		if err := c.Connect(ctx); err != nil {
+			return err
+		}
+		return c.Call(ctx, method, params, result)
+	}
 	_ = c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
 	err := c.conn.WriteJSON(req)
 	c.connMu.Unlock()
 
 	if err != nil {
+		// Write failed - connection is broken, mark disconnected
+		c.setConnected(false)
 		return fmt.Errorf("failed to send request: %w", err)
 	}
 
@@ -239,6 +250,35 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}, re
 // readResponses reads responses from the WebSocket connection
 func (c *Client) readResponses() {
 	defer func() {
+		// Recover from panics (e.g., gorilla/websocket panics on reads
+		// from a failed connection after middleware restarts)
+		if r := recover(); r != nil {
+			// Recovered from panic - fall through to cleanup
+		}
+
+		c.setConnected(false)
+
+		// Close the broken connection so Connect() can establish a new one
+		c.connMu.Lock()
+		if c.conn != nil {
+			_ = c.conn.Close()
+			c.conn = nil
+		}
+		c.connMu.Unlock()
+
+		// Notify all waiting callers that the connection was lost
+		c.responsesMu.Lock()
+		for id, ch := range c.responses {
+			ch <- &JSONRPCResponse{
+				ID: id,
+				Error: &JSONRPCError{
+					Code:    -1,
+					Message: "connection lost",
+				},
+			}
+		}
+		c.responsesMu.Unlock()
+
 		c.wg.Done()
 	}()
 
@@ -260,7 +300,6 @@ func (c *Client) readResponses() {
 		var resp JSONRPCResponse
 		if err := conn.ReadJSON(&resp); err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				c.setConnected(false)
 				return
 			}
 			// Check if it's a timeout - if so, check if we should continue
@@ -279,11 +318,9 @@ func (c *Client) readResponses() {
 					continue
 				}
 			}
-			// Other connection error - mark as disconnected
-			c.setConnected(false)
+			// Other connection error - mark as disconnected and exit
 			return
 		}
-
 
 		// Successfully read a response - refresh deadline for next read
 		c.connMu.Lock()

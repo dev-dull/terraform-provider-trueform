@@ -199,3 +199,84 @@ resource "trueform_static_route" "test" {
   gateway     = var.static_route_gateway
   description = "Test static route created by Terraform provider test suite"
 }
+
+# =============================================================================
+# Docker Configuration
+# =============================================================================
+# Apps require Docker to be configured with a pool. This uses the TrueNAS API
+# to set the apps pool after the pool is created, before the app is deployed.
+# =============================================================================
+
+resource "terraform_data" "docker_config" {
+  input = trueform_pool.test.name
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Configure Docker to use the test pool via TrueNAS REST API
+      JOB_ID=$(curl -sk -X PUT "https://${var.truenas_host}/api/v2.0/docker" \
+        -H "Authorization: Bearer ${var.truenas_api_key}" \
+        -H "Content-Type: application/json" \
+        -d '{"pool": "${trueform_pool.test.name}"}')
+
+      echo "Docker config job $JOB_ID started, waiting..."
+
+      # Poll until the job completes (up to 5 minutes)
+      for i in $(seq 1 60); do
+        sleep 5
+        STATE=$(curl -sk "https://${var.truenas_host}/api/v2.0/core/get_jobs?id=$JOB_ID" \
+          -H "Authorization: Bearer ${var.truenas_api_key}" \
+          | python3 -c "import sys,json; jobs=json.load(sys.stdin); print(jobs[0]['state'] if jobs else 'UNKNOWN')")
+
+        if [ "$STATE" = "SUCCESS" ]; then
+          echo "Docker configured successfully"
+
+          # Wait for Docker service to fully start
+          echo "Waiting for Docker service to be ready..."
+          for j in $(seq 1 24); do
+            DOCKER_STATE=$(curl -sk "https://${var.truenas_host}/api/v2.0/docker/status" \
+              -H "Authorization: Bearer ${var.truenas_api_key}" \
+              | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','UNKNOWN'))" 2>/dev/null)
+            echo "  Docker status: $DOCKER_STATE"
+            if [ "$DOCKER_STATE" = "RUNNING" ]; then
+              echo "Docker is ready"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Docker configured but service may not be fully ready yet"
+          exit 0
+        elif [ "$STATE" = "FAILED" ]; then
+          echo "ERROR: Docker config job failed"
+          exit 1
+        fi
+        echo "  Waiting... ($STATE)"
+      done
+
+      echo "ERROR: Timed out waiting for Docker config"
+      exit 1
+    EOT
+  }
+
+  depends_on = [trueform_pool.test]
+}
+
+# =============================================================================
+# App
+# =============================================================================
+
+resource "trueform_app" "test" {
+  name        = "${var.test_prefix}-app"
+  catalog_app = var.test_app_name
+  train       = var.test_app_train
+  version     = var.test_app_version
+  values = jsonencode({
+    image = {
+      repository = "busybox"
+      tag        = "latest"
+      pull_policy = "missing"
+    }
+    command = ["sleep", "3600"]
+  })
+
+  depends_on = [terraform_data.docker_config]
+}

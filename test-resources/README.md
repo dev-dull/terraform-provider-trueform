@@ -42,6 +42,7 @@ test-resources/
 | `trueform_user` | Creates user | Imports by ID | Updates email, full name |
 | `trueform_cronjob` | Disabled, daily | Imports by ID | Enabled, hourly |
 | `trueform_static_route` | Creates route | Imports by ID | Updates description |
+| `trueform_app` | Deploys app (configures Docker) | Imports by name | Removed (pool destroyed) |
 
 ## Prerequisites
 
@@ -52,7 +53,7 @@ You need a TrueNAS Scale 25.04+ instance. A VM with snapshot capability is recom
 - **CPU**: 2+ cores
 - **RAM**: 8GB minimum
 - **Boot disk**: 32GB
-- **Test disks**: 4x 256MB virtual disks (for pool testing)
+- **Test disks**: 4x 512MB+ virtual disks (for pool and Docker/app testing)
 
 After installation:
 1. Complete the TrueNAS setup wizard
@@ -113,7 +114,7 @@ cd test-resources/create
 terraform apply -auto-approve
 ```
 
-**Expected**: 13 resources created.
+**Expected**: 15 resources created (includes Docker configuration and app deployment).
 
 Note the resource IDs in the output — you'll need them for the import phase.
 
@@ -134,7 +135,7 @@ The import config mirrors `create/main.tf` exactly. After import, `terraform pla
 
    ```bash
    cd test-resources/import
-   terraform apply -auto-approve   # Imports 13 resources
+   terraform apply -auto-approve   # Imports 14 resources (app values update expected)
    terraform plan                   # Should show "No changes"
    ```
 
@@ -156,7 +157,7 @@ The import config mirrors `create/main.tf` exactly. After import, `terraform pla
    **Expected**: 1 added, 11 changed, 2 destroyed.
    - **1 added**: New snapshot (snapshots are immutable)
    - **11 changed**: Updated resources
-   - **2 destroyed**: Old snapshot replaced, pool removed from config
+   - **2 destroyed**: Old snapshot replaced, pool removed from config (cascades Docker/app teardown)
 
 ### Phase 4: Destroy
 
@@ -218,6 +219,9 @@ terraform destroy -auto-approve
 | `iscsi_listen_ip` | `"0.0.0.0"` | iSCSI portal listen address |
 | `static_route_destination` | `"10.99.99.0/24"` | Test route destination |
 | `test_user_password` | `"TestPassword123!"` | Password for test user |
+| `test_app_name` | `"ix-app"` | Catalog app for testing |
+| `test_app_train` | `"stable"` | Catalog train for test app |
+| `test_app_version` | `"1.3.4"` | Version of test app |
 
 ## Troubleshooting
 

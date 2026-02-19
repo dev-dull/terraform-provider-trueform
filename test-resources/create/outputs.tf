@@ -72,6 +72,16 @@ output "static_route_id" {
   value       = trueform_static_route.test.id
 }
 
+output "app_id" {
+  description = "ID of the created app"
+  value       = trueform_app.test.id
+}
+
+output "app_state" {
+  description = "State of the created app"
+  value       = trueform_app.test.state
+}
+
 output "summary" {
   description = "Summary of all created resources"
   value = {
@@ -87,5 +97,6 @@ output "summary" {
     user               = trueform_user.test.username
     cronjob            = trueform_cronjob.test.description
     static_route       = trueform_static_route.test.destination
+    app                = trueform_app.test.name
   }
 }
