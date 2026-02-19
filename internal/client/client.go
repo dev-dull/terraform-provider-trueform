@@ -143,10 +143,33 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
-// authenticate performs API key authentication
+// loginExResponse represents the response from auth.login_ex
+type loginExResponse struct {
+	ResponseType string `json:"response_type"`
+	Username     string `json:"username,omitempty"`
+}
+
+// authenticate performs API key authentication using auth.login_ex (TrueNAS 25.04+)
+// with fallback to auth.login_with_api_key for older versions
 func (c *Client) authenticate(ctx context.Context) error {
+	// Try modern auth.login_ex with API_KEY_PLAIN mechanism first
+	var loginExResp loginExResponse
+	err := c.Call(ctx, "auth.login_ex", []interface{}{
+		map[string]interface{}{
+			"mechanism": "API_KEY_PLAIN",
+			"api_key":   c.apiKey,
+		},
+	}, &loginExResp)
+	if err == nil {
+		if loginExResp.ResponseType == "SUCCESS" {
+			return nil
+		}
+		return fmt.Errorf("authentication failed: login_ex returned %s", loginExResp.ResponseType)
+	}
+
+	// Fall back to legacy auth.login_with_api_key for older TrueNAS versions
 	var result bool
-	err := c.Call(ctx, "auth.login_with_api_key", []interface{}{c.apiKey}, &result)
+	err = c.Call(ctx, "auth.login_with_api_key", []interface{}{c.apiKey}, &result)
 	if err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}

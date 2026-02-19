@@ -205,7 +205,7 @@ TF_ACC=1 go test ./... -v
 This provider communicates with TrueNAS using the WebSocket JSON-RPC 2.0 API introduced in TrueNAS Scale 25.04. The connection flow is:
 
 1. Establish WebSocket connection to `wss://<host>/api/current`
-2. Authenticate using `auth.login_with_api_key`
+2. Authenticate using `auth.login_ex` with the `API_KEY_PLAIN` mechanism (falls back to `auth.login_with_api_key` for older TrueNAS versions)
 3. Execute JSON-RPC calls for resource operations
 
 ## Contributing
