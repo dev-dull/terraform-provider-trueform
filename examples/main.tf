@@ -222,6 +222,25 @@ resource "trueform_iscsi_targetextent" "lun0_mapping" {
 }
 
 # =============================================================================
+# Application (Optional - requires Docker pool configured)
+# =============================================================================
+
+# resource "trueform_app" "myapp" {
+#   name        = "myapp"
+#   catalog_app = "ix-app"
+#   train       = "stable"
+#   version     = "1.3.4"
+#
+#   values = jsonencode({
+#     image = {
+#       repository  = "nginx"
+#       tag         = "latest"
+#       pull_policy = "missing"
+#     }
+#   })
+# }
+
+# =============================================================================
 # Virtual Machine (Optional - requires VM license/capability)
 # =============================================================================
 

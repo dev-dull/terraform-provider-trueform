@@ -11,6 +11,8 @@ Manages an application on TrueNAS Scale. Apps are deployed from the TrueNAS app 
 
 ~> **Note:** Changing the `name` or `catalog_app` will force recreation of the application.
 
+~> **Prerequisite:** A Docker/Apps pool must be configured on TrueNAS before deploying apps. Configure this in the TrueNAS UI under **Apps > Settings > Choose a pool**, or via the REST API (`PUT /api/v2.0/docker`).
+
 ## Example Usage
 
 ### Basic App
@@ -30,6 +32,25 @@ resource "trueform_app" "nextcloud" {
   catalog_app = "nextcloud"
   train       = "stable"
   version     = "29.0.0"
+}
+```
+
+### Custom App (ix-app)
+
+```hcl
+resource "trueform_app" "myapp" {
+  name        = "myapp"
+  catalog_app = "ix-app"
+  train       = "stable"
+  version     = "1.3.4"
+
+  values = jsonencode({
+    image = {
+      repository  = "nginx"
+      tag         = "latest"
+      pull_policy = "missing"
+    }
+  })
 }
 ```
 
@@ -60,7 +81,7 @@ resource "trueform_app" "minio" {
 ### Optional
 
 - `train` (String) The catalog train (e.g., `stable`, `community`).
-- `values` (String) JSON-encoded configuration values for the app.
+- `values` (String) JSON-encoded configuration values for the app. This field is write-only — values are sent to TrueNAS on create/update but cannot be read back, so import will always show a diff if values are set.
 - `version` (String) The app version to deploy. Changing this triggers an upgrade.
 
 ### Read-Only

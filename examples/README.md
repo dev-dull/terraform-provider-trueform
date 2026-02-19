@@ -40,6 +40,7 @@ The `main.tf` file demonstrates:
 | **Cron Job** | Scheduled task execution |
 | **Static Route** | Network routing configuration |
 | **iSCSI** | Block storage (portal, initiator, target, extent) |
+| **App** | Application deployment (commented out, requires Docker pool) |
 | **VM** | Virtual machine (commented out) |
 
 ## Provider Configuration
@@ -134,6 +135,27 @@ resource "trueform_cronjob" "backup" {
   }
 }
 ```
+
+### App
+
+```hcl
+resource "trueform_app" "myapp" {
+  name        = "myapp"
+  catalog_app = "ix-app"
+  train       = "stable"
+  version     = "1.3.4"
+
+  values = jsonencode({
+    image = {
+      repository  = "nginx"
+      tag         = "latest"
+      pull_policy = "missing"
+    }
+  })
+}
+```
+
+> **Note:** A Docker pool must be configured on TrueNAS before deploying apps.
 
 ## Additional Examples
 
