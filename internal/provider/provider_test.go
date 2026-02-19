@@ -72,6 +72,7 @@ func TestProviderResources(t *testing.T) {
 		"iscsi_targetextent",
 		"certificate",
 		"static_route",
+		"service_docker",
 	}
 
 	if len(resources) != len(expectedResources) {
