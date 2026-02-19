@@ -40,6 +40,7 @@ The `main.tf` file demonstrates:
 | **Cron Job** | Scheduled task execution |
 | **Static Route** | Network routing configuration |
 | **iSCSI** | Block storage (portal, initiator, target, extent) |
+| **Docker Service** | Docker/Apps service configuration (commented out) |
 | **App** | Application deployment (commented out, requires Docker pool) |
 | **VM** | Virtual machine (commented out) |
 
@@ -155,7 +156,7 @@ resource "trueform_app" "myapp" {
 }
 ```
 
-> **Note:** A Docker pool must be configured on TrueNAS before deploying apps.
+> **Note:** A Docker pool must be configured before deploying apps. Use the `trueform_service_docker` resource or configure in the TrueNAS UI.
 
 ## Additional Examples
 

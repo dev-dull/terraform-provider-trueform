@@ -222,6 +222,14 @@ resource "trueform_iscsi_targetextent" "lun0_mapping" {
 }
 
 # =============================================================================
+# Docker/Apps Service (Required before deploying apps)
+# =============================================================================
+
+# resource "trueform_service_docker" "apps" {
+#   pool = data.trueform_pool.main.name
+# }
+
+# =============================================================================
 # Application (Optional - requires Docker pool configured)
 # =============================================================================
 

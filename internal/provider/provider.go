@@ -166,6 +166,7 @@ func (p *TrueformProvider) Resources(ctx context.Context) []func() resource.Reso
 		resources.NewISCSITargetExtentResource,
 		resources.NewCertificateResource,
 		resources.NewStaticRouteResource,
+		resources.NewServiceDockerResource,
 	}
 }
 

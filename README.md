@@ -88,6 +88,7 @@ export TRUENAS_VERIFY_SSL="true"
 | `trueform_vm` | Manage virtual machines |
 | `trueform_vm_device` | Manage VM devices (disks, NICs, etc.) |
 | `trueform_app` | Manage applications |
+| `trueform_service_docker` | Manage Docker/Apps service configuration |
 | `trueform_cronjob` | Manage scheduled tasks |
 | `trueform_certificate` | Manage SSL/TLS certificates |
 | `trueform_static_route` | Manage network routes |

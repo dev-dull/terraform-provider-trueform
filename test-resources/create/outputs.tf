@@ -72,6 +72,11 @@ output "static_route_id" {
   value       = trueform_static_route.test.id
 }
 
+output "docker_status" {
+  description = "Status of the Docker service"
+  value       = trueform_service_docker.config.status
+}
+
 output "app_id" {
   description = "ID of the created app"
   value       = trueform_app.test.id
@@ -97,6 +102,7 @@ output "summary" {
     user               = trueform_user.test.username
     cronjob            = trueform_cronjob.test.description
     static_route       = trueform_static_route.test.destination
+    docker             = trueform_service_docker.config.status
     app                = trueform_app.test.name
   }
 }

@@ -252,9 +252,7 @@ func (c *Client) readResponses() {
 	defer func() {
 		// Recover from panics (e.g., gorilla/websocket panics on reads
 		// from a failed connection after middleware restarts)
-		if r := recover(); r != nil {
-			// Recovered from panic - fall through to cleanup
-		}
+		recover()
 
 		c.setConnected(false)
 

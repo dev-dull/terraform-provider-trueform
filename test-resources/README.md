@@ -42,7 +42,8 @@ test-resources/
 | `trueform_user` | Creates user | Imports by ID | Updates email, full name |
 | `trueform_cronjob` | Disabled, daily | Imports by ID | Enabled, hourly |
 | `trueform_static_route` | Creates route | Imports by ID | Updates description |
-| `trueform_app` | Deploys app (configures Docker) | Imports by name | Removed (pool destroyed) |
+| `trueform_service_docker` | Configures Docker pool | — | Removed (pool destroyed) |
+| `trueform_app` | Deploys app | Imports by name | Removed (pool destroyed) |
 
 ## Prerequisites
 

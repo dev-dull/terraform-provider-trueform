@@ -11,7 +11,7 @@ Manages an application on TrueNAS Scale. Apps are deployed from the TrueNAS app 
 
 ~> **Note:** Changing the `name` or `catalog_app` will force recreation of the application.
 
-~> **Prerequisite:** A Docker/Apps pool must be configured on TrueNAS before deploying apps. Configure this in the TrueNAS UI under **Apps > Settings > Choose a pool**, or via the REST API (`PUT /api/v2.0/docker`).
+~> **Prerequisite:** A Docker/Apps pool must be configured on TrueNAS before deploying apps. Use the [`trueform_service_docker`](service_docker.md) resource, or configure manually in the TrueNAS UI under **Apps > Settings > Choose a pool**.
 
 ## Example Usage
 
