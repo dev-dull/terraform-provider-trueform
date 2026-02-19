@@ -4,7 +4,7 @@ description: |-
   The Trueform provider enables Terraform to manage TrueNAS Scale resources.
 ---
 
-# Trueform Provider
+<img src="https://raw.githubusercontent.com/dev-dull/terraform-provider-trueform/main/logo.svg" alt="Trueform" width="400">
 
 The Trueform provider enables Terraform to manage [TrueNAS Scale](https://www.truenas.com/truenas-scale/) resources using the WebSocket JSON-RPC API.
 
