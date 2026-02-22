@@ -201,6 +201,26 @@ export TRUENAS_API_KEY="your-api-key"
 TF_ACC=1 go test ./... -v
 ```
 
+### Releasing
+
+This project uses [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** — breaking changes to resource schemas or provider configuration
+- **MINOR** — new resources, data sources, or features
+- **PATCH** — bug fixes, documentation updates, lint fixes
+
+To cut a release:
+
+1. Push your changes to `main`.
+2. Wait for CI (lint, build, and tests) to pass.
+3. Tag the passing commit:
+   ```bash
+   git tag v0.X.Y
+   git push origin v0.X.Y
+   ```
+
+The Terraform Registry picks up new versions via GitHub tag-creation webhooks. Do not force-push tags — if a tag needs to be revised, create a new patch version instead.
+
 ## Technical Details
 
 This provider communicates with TrueNAS using the WebSocket JSON-RPC 2.0 API introduced in TrueNAS Scale 25.04. The connection flow is:
