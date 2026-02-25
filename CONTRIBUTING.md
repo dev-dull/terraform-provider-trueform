@@ -16,12 +16,20 @@ Create a new VM in the Proxmox UI with the following specs:
 |---------|-------|
 | CPU | 2 cores |
 | RAM | 8 GB |
-| Boot disk | 32 GB SCSI on any storage backend |
-| Test disks | 4x 512 MB SCSI disks on any storage backend |
+| Boot disk | 32 GB SCSI, **qcow2 format** |
+| Test disks | 4x 512 MB SCSI disks, **qcow2 format** |
 | Network | 1x virtio NIC on a bridged network with DHCP |
 | OS | Attach the TrueNAS SCALE ISO |
 
 The 4 test disks are used by the integration tests to create and destroy ZFS pools. They must be small (512 MB is sufficient) and separate from the boot disk.
+
+**Important: use qcow2 disk format.** Proxmox snapshots require qcow2 when using NFS-backed storage (e.g., `truenas-vdisk`). Raw format disks do not support snapshots on NFS — the snapshot will fail with "snapshot feature is not available". If you accidentally created the VM with raw disks, you can convert them while the VM is stopped:
+
+```
+qm move_disk <vmid> scsi0 <storage> --format qcow2 --delete 1
+```
+
+Repeat for each disk (`scsi0` through `scsi4`). The conversions must run one at a time (Proxmox locks the VM config during each move). Local storage backends (LVM-thin, ZFS) support snapshots with any format.
 
 **Disk naming:** Proxmox SCSI disks appear as `sd*` in the guest. The boot disk is typically `sda`, so the 4 test disks will be `sdb`, `sdc`, `sdd`, `sde`. Verify after install using the `disk.query` API (see step 5).
 
