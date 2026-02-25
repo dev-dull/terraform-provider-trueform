@@ -49,18 +49,24 @@ test-resources/
 
 ### TrueNAS Scale VM
 
-You need a TrueNAS Scale 25.04+ instance. A VM with snapshot capability is recommended for easy state restoration between test runs.
+You need a TrueNAS Scale 25.04+ instance. A VM with snapshot capability is recommended for easy state restoration between test runs. See [CONTRIBUTING.md](../CONTRIBUTING.md) for full Proxmox VM setup instructions.
 
 - **CPU**: 2+ cores
 - **RAM**: 8GB minimum
 - **Boot disk**: 32GB
 - **Test disks**: 4x 512MB+ virtual disks (for pool and Docker/app testing)
 
+**Disk naming by hypervisor:**
+- **Proxmox** (SCSI): `sda` (boot), `sdb`, `sdc`, `sdd`, `sde` (test disks)
+- **XCP-NG** (Xen VBD): `xvda` (boot), `xvdb`, `xvdc`, etc.
+
 After installation:
 1. Complete the TrueNAS setup wizard
 2. Create an API key: **Credentials > API Keys > Add**
 3. Note the IP address and API key
-4. **Create a VM snapshot** for easy restoration
+4. **Create a VM snapshot** (e.g., `clean-install`) for easy restoration
+
+**Snapshot-revert workflow:** Before each full test cycle, revert the VM to the clean snapshot. This guarantees no leftover pools, datasets, or shares from previous runs. The API key persists across reverts (it was created before the snapshot).
 
 ### Store Credentials
 
@@ -205,7 +211,7 @@ terraform destroy -auto-approve
 |----------|-------------|---------|
 | `truenas_host` | TrueNAS host IP or hostname | all |
 | `truenas_api_key` | API key for authentication | all |
-| `pool_disks` | List of disk identifiers (e.g., `["xvdb", "xvdc"]`) | create, import |
+| `pool_disks` | List of disk identifiers (e.g., `["sdb", "sdc"]`) | create, import |
 | `nfs_allowed_network` | CIDR for NFS access (e.g., `192.168.1.0/24`) | create, import |
 | `nfs_allowed_networks` | List of CIDRs for NFS access | modify |
 | `static_route_gateway` | Gateway IP for static route | all |

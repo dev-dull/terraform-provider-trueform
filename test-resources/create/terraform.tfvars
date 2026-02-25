@@ -5,7 +5,7 @@ truenas_verify_ssl = false
 
 # Pool configuration
 pool_name  = "testpool"
-pool_disks = ["xvdb", "xvdc", "xvde", "xvdf"]
+pool_disks = ["sdb", "sdc", "sdd", "sde"]
 
 # Network configuration
 nfs_allowed_network  = "192.168.1.0/24"
