@@ -73,6 +73,11 @@ resource "trueform_app" "myapp" {
 - `id` (String) Resource identifier (always `docker`).
 - `status` (String) Current Docker service status (e.g., `RUNNING`, `INITIALIZING`, `STOPPED`).
 
+## Behavior Notes
+
+- **Pool reconfiguration:** When updating with the same pool that is already configured, the provider first unconfigures Docker (sets pool to null) and then reconfigures it. This ensures a clean setup of Docker datasets, which is required on TrueNAS 25.10+. The operation stops all running applications temporarily.
+- **Startup timeout:** After configuration, the provider waits up to 10 minutes for Docker to reach `RUNNING` status. Initial setup on a new pool may take several minutes as TrueNAS creates the required datasets and starts the Docker daemon.
+
 ## Import
 
 The Docker service can be imported using the literal ID `docker`:

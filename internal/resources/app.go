@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -254,19 +255,86 @@ func (r *AppResource) Delete(ctx context.Context, req resource.DeleteRequest, re
 		return
 	}
 
+	appName := state.ID.ValueString()
+
 	tflog.Debug(ctx, "Deleting app", map[string]interface{}{
-		"name": state.ID.ValueString(),
+		"name": appName,
 	})
 
+	// Stop the app first to avoid 'down' action failures during delete.
+	// This is best-effort: if Docker is already gone (e.g., pool destroyed),
+	// the stop will fail and we proceed to delete anyway.
+	if state.State.ValueString() == "RUNNING" {
+		tflog.Debug(ctx, "Stopping app before deletion", map[string]interface{}{
+			"name": appName,
+		})
+		var stopJobID float64
+		err := r.client.Call(ctx, "app.stop", []interface{}{appName}, &stopJobID)
+		if err != nil {
+			tflog.Debug(ctx, "Could not stop app (may already be stopped), proceeding to delete", map[string]interface{}{
+				"error": err.Error(),
+			})
+		} else if _, err := r.client.WaitForJob(ctx, int64(stopJobID), 5*time.Minute); err != nil {
+			tflog.Debug(ctx, "App stop job failed (may already be stopped), proceeding to delete", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
+	}
+
 	var jobID float64
-	err := r.client.Call(ctx, "app.delete", []interface{}{state.ID.ValueString()}, &jobID)
+	err := r.client.Call(ctx, "app.delete", []interface{}{
+		appName,
+		map[string]interface{}{
+			"remove_images":    true,
+			"remove_ix_volumes": true,
+		},
+	}, &jobID)
 	if err != nil {
+		// If the app is already gone (e.g., pool was destroyed), treat as success
+		if isAppNotFoundError(err) {
+			tflog.Debug(ctx, "App already removed, nothing to delete", map[string]interface{}{
+				"name": appName,
+			})
+			return
+		}
 		resp.Diagnostics.AddError("Error Deleting App", "Could not delete app: "+err.Error())
 		return
 	}
 	if _, err := r.client.WaitForJob(ctx, int64(jobID), 5*time.Minute); err != nil {
-		resp.Diagnostics.AddError("Error Deleting App", "App delete job failed: "+err.Error())
-		return
+		// If the job failed because the app no longer exists, treat as success
+		if isAppNotFoundError(err) {
+			tflog.Debug(ctx, "App already removed during delete job", map[string]interface{}{
+				"name": appName,
+			})
+			return
+		}
+		// If normal delete fails, retry with force_remove_custom_app
+		tflog.Debug(ctx, "Normal app delete failed, retrying with force_remove_custom_app", map[string]interface{}{
+			"error": err.Error(),
+		})
+		var forceJobID float64
+		forceErr := r.client.Call(ctx, "app.delete", []interface{}{
+			appName,
+			map[string]interface{}{
+				"remove_images":           true,
+				"remove_ix_volumes":       true,
+				"force_remove_custom_app": true,
+			},
+		}, &forceJobID)
+		if forceErr != nil {
+			if isAppNotFoundError(forceErr) {
+				return
+			}
+			resp.Diagnostics.AddError("Error Deleting App", "Could not force delete app: "+forceErr.Error())
+			return
+		}
+		if _, forceErr := r.client.WaitForJob(ctx, int64(forceJobID), 5*time.Minute); forceErr != nil {
+			if isAppNotFoundError(forceErr) {
+				return
+			}
+			resp.Diagnostics.AddError("Error Deleting App", "App delete job failed: "+err.Error()+"; force delete also failed: "+forceErr.Error())
+			return
+		}
 	}
 }
 
@@ -313,4 +381,14 @@ func (r *AppResource) readApp(ctx context.Context, name string, model *AppResour
 	}
 
 	return nil
+}
+
+// isAppNotFoundError checks if an error indicates the app no longer exists.
+// This handles both API errors and job failure messages from TrueNAS.
+func isAppNotFoundError(err error) bool {
+	if client.IsNotFoundError(err) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "does not exist") || strings.Contains(msg, "ENOENT")
 }

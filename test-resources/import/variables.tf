@@ -84,5 +84,5 @@ variable "test_app_train" {
 variable "test_app_version" {
   description = "Version of the test app to deploy"
   type        = string
-  default     = "1.3.4"
+  default     = "1.3.5"
 }

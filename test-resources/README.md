@@ -161,10 +161,10 @@ The import config mirrors `create/main.tf` exactly. After import, `terraform pla
    terraform apply -auto-approve
    ```
 
-   **Expected**: 1 added, 11 changed, 2 destroyed.
+   **Expected**: 1 added, 11 changed, 3 destroyed.
    - **1 added**: New snapshot (snapshots are immutable)
    - **11 changed**: Updated resources
-   - **2 destroyed**: Old snapshot replaced, pool removed from config (cascades Docker/app teardown)
+   - **3 destroyed**: Old snapshot replaced, app removed, pool removed from config
 
 ### Phase 4: Destroy
 
@@ -228,7 +228,7 @@ terraform destroy -auto-approve
 | `test_user_password` | `"TestPassword123!"` | Password for test user |
 | `test_app_name` | `"ix-app"` | Catalog app for testing |
 | `test_app_train` | `"stable"` | Catalog train for test app |
-| `test_app_version` | `"1.3.4"` | Version of test app |
+| `test_app_version` | `"1.3.5"` | Version of test app |
 
 ## Troubleshooting
 

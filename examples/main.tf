@@ -237,7 +237,7 @@ resource "trueform_iscsi_targetextent" "lun0_mapping" {
 #   name        = "myapp"
 #   catalog_app = "ix-app"
 #   train       = "stable"
-#   version     = "1.3.4"
+#   version     = "1.3.5"
 #
 #   values = jsonencode({
 #     image = {

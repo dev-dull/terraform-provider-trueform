@@ -197,8 +197,32 @@ func (r *ServiceDockerResource) Delete(ctx context.Context, req resource.DeleteR
 }
 
 func (r *ServiceDockerResource) updateDocker(ctx context.Context, plan *ServiceDockerResourceModel) error {
+	targetPool := plan.Pool.ValueString()
+
+	// If Docker is already configured with the same pool, unset it first to force
+	// a clean dataset re-creation. TrueNAS 25.10+ won't reinitialize ix-apps datasets
+	// on a same-pool update, so we cycle through null to trigger a fresh setup.
+	// When changing to a different pool, TrueNAS handles the transition natively.
+	var currentConfig map[string]interface{}
+	if err := r.client.Call(ctx, "docker.config", []interface{}{}, &currentConfig); err == nil {
+		if currentPool, _ := currentConfig["pool"].(string); currentPool == targetPool && currentPool != "" {
+			tflog.Debug(ctx, "Unsetting existing Docker pool before reconfiguring (same pool)", map[string]interface{}{
+				"pool": currentPool,
+			})
+			var unsetJobID float64
+			if err := r.client.Call(ctx, "docker.update", []interface{}{
+				map[string]interface{}{"pool": nil},
+			}, &unsetJobID); err != nil {
+				return fmt.Errorf("could not unset Docker pool: %w", err)
+			}
+			if _, err := r.client.WaitForJob(ctx, int64(unsetJobID), 5*time.Minute); err != nil {
+				return fmt.Errorf("Docker pool unset job failed: %w", err)
+			}
+		}
+	}
+
 	updateData := map[string]interface{}{
-		"pool": plan.Pool.ValueString(),
+		"pool": targetPool,
 	}
 
 	if !plan.NvidiaEnabled.IsNull() && !plan.NvidiaEnabled.IsUnknown() {
@@ -222,7 +246,7 @@ func (r *ServiceDockerResource) updateDocker(ctx context.Context, plan *ServiceD
 }
 
 func (r *ServiceDockerResource) waitForRunning(ctx context.Context) error {
-	timeout := 5 * time.Minute
+	timeout := 10 * time.Minute
 	pollInterval := 2 * time.Second
 	deadline := time.Now().Add(timeout)
 
