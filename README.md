@@ -15,7 +15,7 @@ The name TrueForm is taking "form" from Terraform, and "true" from TrueNAS.
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.0
-- [Go](https://golang.org/doc/install) >= 1.24 (for building from source)
+- [Go](https://golang.org/doc/install) >= 1.25 (for building from source)
 - TrueNAS Scale 25.04 or later
 
 ## Installation

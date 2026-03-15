@@ -32,7 +32,7 @@ Navigate to: **Repository Settings → Secrets and variables → Actions**
 
 ## Local Development
 
-- [ ] Go 1.21+ installed
+- [ ] Go 1.25+ installed
 - [ ] GoReleaser installed (`brew install goreleaser`)
 - [ ] golangci-lint installed (`brew install golangci-lint`)
 
