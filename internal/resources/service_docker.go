@@ -216,7 +216,7 @@ func (r *ServiceDockerResource) updateDocker(ctx context.Context, plan *ServiceD
 				return fmt.Errorf("could not unset Docker pool: %w", err)
 			}
 			if _, err := r.client.WaitForJob(ctx, int64(unsetJobID), 5*time.Minute); err != nil {
-				return fmt.Errorf("Docker pool unset job failed: %w", err)
+				return fmt.Errorf("docker pool unset job failed: %w", err)
 			}
 		}
 	}
@@ -239,7 +239,7 @@ func (r *ServiceDockerResource) updateDocker(ctx context.Context, plan *ServiceD
 	}
 
 	if _, err := r.client.WaitForJob(ctx, int64(jobID), 5*time.Minute); err != nil {
-		return fmt.Errorf("Docker update job failed: %w", err)
+		return fmt.Errorf("docker update job failed: %w", err)
 	}
 
 	return nil

@@ -135,7 +135,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	// Authenticate with API key
 	if err := c.authenticate(ctx); err != nil {
 		c.connMu.Lock()
-		c.close()
+		_ = c.close()
 		c.connMu.Unlock()
 		return err
 	}
