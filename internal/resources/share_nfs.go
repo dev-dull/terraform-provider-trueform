@@ -12,7 +12,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 
@@ -60,6 +63,9 @@ func (r *ShareNFSResource) Schema(ctx context.Context, req resource.SchemaReques
 			"id": schema.Int64Attribute{
 				Description: "The unique identifier for the share.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"path": schema.StringAttribute{
 				Description: "The path to share.",
@@ -134,6 +140,9 @@ func (r *ShareNFSResource) Schema(ctx context.Context, req resource.SchemaReques
 			"locked": schema.BoolAttribute{
 				Description: "Whether the share is locked.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -467,6 +476,18 @@ func (r *ShareNFSResource) readShare(ctx context.Context, id int64, model *Share
 		hostValues, diags := types.ListValueFrom(ctx, types.StringType, hostList)
 		if !diags.HasError() {
 			model.Hosts = hostValues
+		}
+	}
+	// aliases is Optional+Computed with an empty-list default; populate so
+	// imported state matches the schema's effective config.
+	if aliases, ok := result["aliases"].([]interface{}); ok {
+		aliasList := make([]string, len(aliases))
+		for i, a := range aliases {
+			aliasList[i] = a.(string)
+		}
+		aliasValues, diags := types.ListValueFrom(ctx, types.StringType, aliasList)
+		if !diags.HasError() {
+			model.Aliases = aliasValues
 		}
 	}
 	if maprootUser, ok := result["maproot_user"].(string); ok {

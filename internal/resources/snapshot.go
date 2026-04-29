@@ -322,6 +322,19 @@ func (r *SnapshotResource) readSnapshot(ctx context.Context, id string, model *S
 		model.Holds = emptyHolds
 	}
 
+	// recursive and vmware_sync are write-only flags — they're consumed by
+	// zfs.snapshot.create but the snapshot record doesn't echo them back. On
+	// import the model is fresh, so default to false to match the schema's
+	// behavior. On refresh of an already-tracked resource the existing state
+	// value is preserved (Read is invoked with the prior model, so non-null
+	// values pass through untouched).
+	if model.Recursive.IsNull() || model.Recursive.IsUnknown() {
+		model.Recursive = types.BoolValue(false)
+	}
+	if model.VMWareSync.IsNull() || model.VMWareSync.IsUnknown() {
+		model.VMWareSync = types.BoolValue(false)
+	}
+
 	if properties, ok := result["properties"].(map[string]interface{}); ok {
 		if referenced, ok := properties["referenced"].(map[string]interface{}); ok {
 			if parsed, ok := referenced["parsed"].(float64); ok {

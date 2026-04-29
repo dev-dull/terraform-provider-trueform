@@ -538,31 +538,52 @@ func (r *ShareSMBResource) readShare(ctx context.Context, id int64, model *Share
 	if enabled, ok := result["enabled"].(bool); ok {
 		model.Enabled = types.BoolValue(enabled)
 	}
-	if home, ok := result["home"].(bool); ok {
-		model.Home = types.BoolValue(home)
-	}
 	if purpose, ok := result["purpose"].(string); ok {
 		model.Purpose = types.StringValue(purpose)
-	}
-	if timemachine, ok := result["timemachine"].(bool); ok {
-		model.TimeMachine = types.BoolValue(timemachine)
-	}
-	if ro, ok := result["ro"].(bool); ok {
-		model.Ro = types.BoolValue(ro)
 	}
 	if browsable, ok := result["browsable"].(bool); ok {
 		model.Browsable = types.BoolValue(browsable)
 	}
-	if recyclebin, ok := result["recyclebin"].(bool); ok {
-		model.Recyclebin = types.BoolValue(recyclebin)
+	if locked, ok := result["locked"].(bool); ok {
+		model.Locked = types.BoolValue(locked)
 	}
-	if guestok, ok := result["guestok"].(bool); ok {
-		model.Guestok = types.BoolValue(guestok)
-	}
-	if abe, ok := result["abe"].(bool); ok {
+
+	// TrueNAS 25.10 renamed several SMB share fields. Read the new names first
+	// and fall back to the legacy flat names so the provider keeps working
+	// against older TrueNAS versions.
+	if abe, ok := result["access_based_share_enumeration"].(bool); ok {
+		model.Abe = types.BoolValue(abe)
+	} else if abe, ok := result["abe"].(bool); ok {
 		model.Abe = types.BoolValue(abe)
 	}
-	if hostsallow, ok := result["hostsallow"].([]interface{}); ok {
+	if ro, ok := result["readonly"].(bool); ok {
+		model.Ro = types.BoolValue(ro)
+	} else if ro, ok := result["ro"].(bool); ok {
+		model.Ro = types.BoolValue(ro)
+	}
+	if audit, ok := result["audit"].(map[string]interface{}); ok {
+		if enable, ok := audit["enable"].(bool); ok {
+			model.AuditLogging = types.BoolValue(enable)
+		}
+	} else if auditLogging, ok := result["audit_logging"].(bool); ok {
+		model.AuditLogging = types.BoolValue(auditLogging)
+	}
+
+	// hostsallow / hostsdeny moved under `options` in 25.10.
+	hostsallowSrc := result["hostsallow"]
+	hostsdenySrc := result["hostsdeny"]
+	if options, ok := result["options"].(map[string]interface{}); ok {
+		if v, ok := options["hostsallow"]; ok {
+			hostsallowSrc = v
+		}
+		if v, ok := options["hostsdeny"]; ok {
+			hostsdenySrc = v
+		}
+	}
+	// Only materialize a list when the API actually returns entries — config
+	// authors leave hostsallow/hostsdeny unset (null), and an empty []
+	// from the API would diverge from null on the next plan.
+	if hostsallow, ok := hostsallowSrc.([]interface{}); ok && len(hostsallow) > 0 {
 		hosts := make([]string, len(hostsallow))
 		for i, h := range hostsallow {
 			hosts[i] = h.(string)
@@ -572,7 +593,7 @@ func (r *ShareSMBResource) readShare(ctx context.Context, id int64, model *Share
 			model.HostsAllow = hostValues
 		}
 	}
-	if hostsdeny, ok := result["hostsdeny"].([]interface{}); ok {
+	if hostsdeny, ok := hostsdenySrc.([]interface{}); ok && len(hostsdeny) > 0 {
 		hosts := make([]string, len(hostsdeny))
 		for i, h := range hostsdeny {
 			hosts[i] = h.(string)
@@ -582,29 +603,62 @@ func (r *ShareSMBResource) readShare(ctx context.Context, id int64, model *Share
 			model.HostsDeny = hostValues
 		}
 	}
+
+	// The following fields are no longer returned by sharing.smb.query on
+	// TrueNAS 25.10 (the API silently accepts them on input for backwards
+	// compatibility but doesn't echo them back). Read them where available
+	// (older TrueNAS); otherwise default to schema defaults so freshly-imported
+	// state matches a config that uses those defaults.
+	if home, ok := result["home"].(bool); ok {
+		model.Home = types.BoolValue(home)
+	} else if model.Home.IsNull() || model.Home.IsUnknown() {
+		model.Home = types.BoolValue(false)
+	}
+	if timemachine, ok := result["timemachine"].(bool); ok {
+		model.TimeMachine = types.BoolValue(timemachine)
+	} else if model.TimeMachine.IsNull() || model.TimeMachine.IsUnknown() {
+		model.TimeMachine = types.BoolValue(false)
+	}
+	if recyclebin, ok := result["recyclebin"].(bool); ok {
+		model.Recyclebin = types.BoolValue(recyclebin)
+	} else if model.Recyclebin.IsNull() || model.Recyclebin.IsUnknown() {
+		model.Recyclebin = types.BoolValue(false)
+	}
+	if guestok, ok := result["guestok"].(bool); ok {
+		model.Guestok = types.BoolValue(guestok)
+	} else if model.Guestok.IsNull() || model.Guestok.IsUnknown() {
+		model.Guestok = types.BoolValue(false)
+	}
 	if auxsmbconf, ok := result["auxsmbconf"].(string); ok {
 		model.AuxSMBConf = types.StringValue(auxsmbconf)
 	}
 	if acl, ok := result["acl"].(bool); ok {
 		model.Acl = types.BoolValue(acl)
+	} else if model.Acl.IsNull() || model.Acl.IsUnknown() {
+		model.Acl = types.BoolValue(true)
 	}
 	if durablehandle, ok := result["durablehandle"].(bool); ok {
 		model.Durablehandle = types.BoolValue(durablehandle)
+	} else if model.Durablehandle.IsNull() || model.Durablehandle.IsUnknown() {
+		model.Durablehandle = types.BoolValue(true)
 	}
 	if shadowcopy, ok := result["shadowcopy"].(bool); ok {
 		model.Shadowcopy = types.BoolValue(shadowcopy)
+	} else if model.Shadowcopy.IsNull() || model.Shadowcopy.IsUnknown() {
+		model.Shadowcopy = types.BoolValue(true)
 	}
 	if streams, ok := result["streams"].(bool); ok {
 		model.Streams = types.BoolValue(streams)
+	} else if model.Streams.IsNull() || model.Streams.IsUnknown() {
+		model.Streams = types.BoolValue(true)
 	}
 	if fsrvp, ok := result["fsrvp"].(bool); ok {
 		model.Fsrvp = types.BoolValue(fsrvp)
+	} else if model.Fsrvp.IsNull() || model.Fsrvp.IsUnknown() {
+		model.Fsrvp = types.BoolValue(false)
 	}
-	if auditLogging, ok := result["audit_logging"].(bool); ok {
-		model.AuditLogging = types.BoolValue(auditLogging)
-	}
-	if locked, ok := result["locked"].(bool); ok {
-		model.Locked = types.BoolValue(locked)
+	if model.AuditLogging.IsNull() || model.AuditLogging.IsUnknown() {
+		model.AuditLogging = types.BoolValue(false)
 	}
 
 	return nil

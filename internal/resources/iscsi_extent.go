@@ -379,8 +379,14 @@ func (r *ISCSIExtentResource) readExtent(ctx context.Context, id int64, model *I
 	if path, ok := result["path"].(string); ok {
 		model.Path = types.StringValue(path)
 	}
+	// TrueNAS 25.10 returns filesize as a string (e.g. "10485760"); older
+	// versions returned a number. Accept both shapes.
 	if filesize, ok := result["filesize"].(float64); ok {
 		model.Filesize = types.Int64Value(int64(filesize))
+	} else if filesizeStr, ok := result["filesize"].(string); ok {
+		if parsed, err := strconv.ParseInt(filesizeStr, 10, 64); err == nil {
+			model.Filesize = types.Int64Value(parsed)
+		}
 	}
 	if blocksize, ok := result["blocksize"].(float64); ok {
 		model.Blocksize = types.Int64Value(int64(blocksize))

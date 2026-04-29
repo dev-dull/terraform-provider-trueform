@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -66,11 +68,17 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"id": schema.Int64Attribute{
 				Description: "The unique identifier for the user.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"uid": schema.Int64Attribute{
 				Description: "Unix user ID.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"username": schema.StringAttribute{
 				Description: "The username.",
@@ -102,6 +110,9 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 				Description: "Primary group ID.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"group_create": schema.BoolAttribute{
 				Description: "Create a new group with the same name as the user.",
@@ -174,6 +185,9 @@ func (r *UserResource) Schema(ctx context.Context, req resource.SchemaRequest, r
 			"builtin": schema.BoolAttribute{
 				Description: "Whether this is a built-in user.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 		},
 	}
@@ -482,6 +496,27 @@ func (r *UserResource) readUser(ctx context.Context, id int64, model *UserResour
 	}
 	if builtin, ok := result["builtin"].(bool); ok {
 		model.Builtin = types.BoolValue(builtin)
+	}
+
+	// The following fields are write-only on TrueNAS 25.10 — the API consumes
+	// them on user.create but doesn't echo them back via user.query. On import
+	// the model is fresh, so default to the values matching the schema's
+	// create-time defaults (mirroring user.go's Create function). On refresh of
+	// an already-tracked resource, prior state values pass through untouched.
+	if model.GroupCreate.IsNull() || model.GroupCreate.IsUnknown() {
+		model.GroupCreate = types.BoolValue(true)
+	}
+	if model.HomeCreate.IsNull() || model.HomeCreate.IsUnknown() {
+		model.HomeCreate = types.BoolValue(false)
+	}
+	if model.HomeMode.IsNull() || model.HomeMode.IsUnknown() {
+		model.HomeMode = types.StringValue("700")
+	}
+	if model.Sudo.IsNull() || model.Sudo.IsUnknown() {
+		model.Sudo = types.BoolValue(false)
+	}
+	if model.SudoNopasswd.IsNull() || model.SudoNopasswd.IsUnknown() {
+		model.SudoNopasswd = types.BoolValue(false)
 	}
 
 	return nil

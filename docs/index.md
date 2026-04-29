@@ -11,8 +11,18 @@ The Trueform provider enables Terraform to manage [TrueNAS Scale](https://www.tr
 ## Requirements
 
 - [Terraform](https://www.terraform.io/downloads.html) >= 1.0
-- [TrueNAS Scale](https://www.truenas.com/truenas-scale/) >= 25.04
+- [TrueNAS Scale](https://www.truenas.com/truenas-scale/) >= 25.04 (verified end-to-end against 25.10.3)
 - A TrueNAS API key with appropriate permissions
+
+## Import Behavior
+
+The provider supports `terraform import` for all resources. On TrueNAS 25.10+, expect a small set of fields to show as "changes" on the first apply after import — these are write-only or sensitive fields that the API does not echo back, and a single in-place update reconciles them with no resource recreation:
+
+- `trueform_app.values` — user-supplied app configuration JSON
+- `trueform_user.password` — sensitive credentials
+- `trueform_share_nfs` may show as updated with no visible field diff (terraform-plugin-framework planner quirk; the apply is a no-op)
+
+The post-import `terraform plan` will be clean once the import-time apply completes.
 
 ## Installation
 

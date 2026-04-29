@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -409,5 +410,78 @@ func (r *PoolResource) readPool(ctx context.Context, id int64, model *PoolResour
 		model.Allocated = types.Int64Value(int64(allocated))
 	}
 
+	// Reconstruct the topology list from the API's nested structure.
+	// API shape: {"topology": {"data": [{"children": [{"disk": "sdb"}, ...]}, ...], "cache": [...], ...}}
+	// Schema shape: [{type: "data", disks: ["sdb", ...]}, ...]
+	if topology, ok := result["topology"].(map[string]interface{}); ok {
+		vdevType := types.ObjectType{AttrTypes: map[string]attr.Type{
+			"type":  types.StringType,
+			"disks": types.ListType{ElemType: types.StringType},
+		}}
+		var elements []attr.Value
+		// Stable ordering: iterate known categories first, then anything else.
+		categories := []string{"data", "log", "cache", "spare", "special", "dedup"}
+		seen := map[string]bool{}
+		for _, cat := range categories {
+			seen[cat] = true
+			vdevs, ok := topology[cat].([]interface{})
+			if !ok || len(vdevs) == 0 {
+				continue
+			}
+			disks := collectVDevDisks(vdevs)
+			if len(disks) == 0 {
+				continue
+			}
+			disksList, _ := types.ListValueFrom(ctx, types.StringType, disks)
+			obj, _ := types.ObjectValue(vdevType.AttrTypes, map[string]attr.Value{
+				"type":  types.StringValue(cat),
+				"disks": disksList,
+			})
+			elements = append(elements, obj)
+		}
+		topologyList, diags := types.ListValueFrom(ctx, vdevType, elements)
+		if !diags.HasError() {
+			model.Topology = topologyList
+		}
+	}
+
+	// Default-if-null for Computed fields that aren't echoed by the API on import.
+	if model.Checksum.IsNull() || model.Checksum.IsUnknown() {
+		model.Checksum = types.StringValue("on")
+	}
+	if model.Deduplication.IsNull() || model.Deduplication.IsUnknown() {
+		model.Deduplication = types.StringValue("OFF")
+	}
+	if model.Encryption.IsNull() || model.Encryption.IsUnknown() {
+		model.Encryption = types.BoolValue(false)
+	}
+
 	return nil
+}
+
+// collectVDevDisks flattens a list of vdev entries into the underlying disk
+// identifiers. Each vdev may carry the disk directly (single-disk stripe) or
+// under a children array (mirror/raidz/etc.).
+func collectVDevDisks(vdevs []interface{}) []string {
+	var disks []string
+	for _, v := range vdevs {
+		vdev, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if children, ok := vdev["children"].([]interface{}); ok && len(children) > 0 {
+			for _, c := range children {
+				if cm, ok := c.(map[string]interface{}); ok {
+					if d, ok := cm["disk"].(string); ok && d != "" {
+						disks = append(disks, d)
+					}
+				}
+			}
+			continue
+		}
+		if d, ok := vdev["disk"].(string); ok && d != "" {
+			disks = append(disks, d)
+		}
+	}
+	return disks
 }

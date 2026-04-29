@@ -519,8 +519,25 @@ func (r *DatasetResource) readDataset(ctx context.Context, id string, model *Dat
 
 	model.Type = types.StringValue(result["type"].(string))
 
-	if comments, ok := result["comments"].(string); ok {
-		model.Comments = types.StringValue(comments)
+	// `comments` is a user-defined ZFS property. On TrueNAS 25.10 it lives
+	// under user_properties.comments.{value}; older TrueNAS versions returned
+	// it at the result root (either as a {value: "..."} object or a flat
+	// string). Handle all three shapes.
+	if userProps, ok := result["user_properties"].(map[string]interface{}); ok {
+		if comments, ok := userProps["comments"].(map[string]interface{}); ok {
+			if value, ok := comments["value"].(string); ok && value != "-" {
+				model.Comments = types.StringValue(value)
+			}
+		}
+	}
+	if model.Comments.IsNull() || model.Comments.IsUnknown() {
+		if comments, ok := result["comments"].(map[string]interface{}); ok {
+			if value, ok := comments["value"].(string); ok && value != "-" {
+				model.Comments = types.StringValue(value)
+			}
+		} else if comments, ok := result["comments"].(string); ok {
+			model.Comments = types.StringValue(comments)
+		}
 	}
 	if compression, ok := result["compression"].(map[string]interface{}); ok {
 		if value, ok := compression["value"].(string); ok {
@@ -627,6 +644,13 @@ func (r *DatasetResource) readDataset(ctx context.Context, id string, model *Dat
 		if parsed, ok := available["parsed"].(float64); ok {
 			model.Available = types.Int64Value(int64(parsed))
 		}
+	}
+
+	// share_type is a creation-only hint on TrueNAS 25.10 and isn't echoed by
+	// pool.dataset.query. Default-if-null so import doesn't see drift against a
+	// configured value.
+	if model.ShareType.IsNull() || model.ShareType.IsUnknown() {
+		model.ShareType = types.StringValue("GENERIC")
 	}
 
 	return nil
