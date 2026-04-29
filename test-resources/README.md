@@ -29,7 +29,7 @@ test-resources/
 
 | Resource Type | Create | Import | Modify |
 |--------------|--------|--------|--------|
-| `trueform_pool` | Creates test pool | Imports by ID | Removed from config (destroyed) |
+| `trueform_pool` | Creates test pool | Imports by ID | Unchanged (destroyed in Phase 4) |
 | `trueform_dataset` | LZ4 compression | Imports by path | Compression → GZIP |
 | `trueform_snapshot` | Creates snapshot | Imports by full path | New snapshot (immutable) |
 | `trueform_share_smb` | Creates SMB share | Imports by ID | Updates comment |
@@ -42,8 +42,8 @@ test-resources/
 | `trueform_user` | Creates user | Imports by ID | Updates email, full name |
 | `trueform_cronjob` | Disabled, daily | Imports by ID | Enabled, hourly |
 | `trueform_static_route` | Creates route | Imports by ID | Updates description |
-| `trueform_service_docker` | Configures Docker pool | — | Removed (pool destroyed) |
-| `trueform_app` | Deploys app | Imports by name | Removed (pool destroyed) |
+| `trueform_service_docker` | Configures Docker pool | — | Unchanged (destroyed in Phase 4) |
+| `trueform_app` | Deploys app | Imports by name | Unchanged (destroyed in Phase 4) |
 
 ## Prerequisites
 
@@ -161,10 +161,12 @@ The import config mirrors `create/main.tf` exactly. After import, `terraform pla
    terraform apply -auto-approve
    ```
 
-   **Expected**: 1 added, 11 changed, 3 destroyed.
-   - **1 added**: New snapshot (snapshots are immutable)
-   - **11 changed**: Updated resources
-   - **3 destroyed**: Old snapshot replaced, app removed, pool removed from config
+   **Expected**: 2 added, ~11 changed, 1 destroyed.
+   - **2 added**: New snapshot (snapshots are immutable) plus one force-new replacement (e.g., a field like iSCSI extent `filesize` may require recreate on TrueNAS 25.10.3)
+   - **~11 changed**: Updated resources
+   - **1 destroyed**: Old snapshot (replaced by the new one)
+
+   **Note:** The pool, `service_docker`, and `app` are intentionally mirrored unchanged from `create/`. Destroying the pool in this phase would cascade-destroy the dataset and the path that SMB/NFS/iSCSI resources live on, breaking the in-flight updates with `[ENOENT] Path not found`. Pool teardown is handled in Phase 4.
 
 ### Phase 4: Destroy
 
@@ -228,7 +230,7 @@ terraform destroy -auto-approve
 | `test_user_password` | `"TestPassword123!"` | Password for test user |
 | `test_app_name` | `"ix-app"` | Catalog app for testing |
 | `test_app_train` | `"stable"` | Catalog train for test app |
-| `test_app_version` | `"1.3.5"` | Version of test app |
+| `test_app_version` | `"1.4.3"` | Version of test app (changes with TrueNAS releases — see Troubleshooting if `[ENOENT] Version not found`) |
 
 ## Troubleshooting
 
@@ -247,6 +249,18 @@ Terraform import blocks require literal strings for the `id` field. Use hardcode
 ### "Resource already exists"
 
 A resource with the same name exists on TrueNAS. Either destroy it manually or restore the VM snapshot.
+
+### "[ENOENT] Version X.Y.Z not found in ix-app app"
+
+The catalog version pinned in `test_app_version` no longer exists in the TrueNAS app catalog. Versions are pruned across releases (e.g. 1.3.4 in 25.10.0, 1.3.5 in 25.10.3). Query the catalog for an available version:
+
+```go
+// Equivalent to:
+// c.Call(ctx, "catalog.get_app_details", []interface{}{"ix-app", map[string]interface{}{"train": "stable"}}, &item)
+// then read item["versions"]
+```
+
+Update the `test_app_version` default in `create/variables.tf` and `import/variables.tf` to match.
 
 ### Connection timeout
 

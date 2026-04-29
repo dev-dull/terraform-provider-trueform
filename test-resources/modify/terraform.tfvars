@@ -4,8 +4,9 @@ truenas_api_key    = "1-0123456789012345668901224567890aAbBcCdDeEfFgGhHiIjJkKlLm
 truenas_verify_ssl = false
 
 # Pool configuration
-pool_name = "testpool"
-base_path = "/mnt/testpool"
+pool_name  = "testpool"
+pool_disks = ["sdb", "sdc", "sdd", "sde"]
+base_path  = "/mnt/testpool"
 
 # Network configuration
 nfs_allowed_networks = ["192.168.1.0/24", "10.0.0.0/8"]

@@ -20,6 +20,12 @@
 # - User: Changed full name, email, enabled sudo
 # - Cronjob: Changed schedule, enabled it, modified command
 # - Static Route: Changed description
+#
+# The pool, service_docker, and app resources are mirrored from create/ with no
+# changes — they MUST stay in modify so Terraform doesn't try to destroy them.
+# Pool destruction cascades in ZFS (kills the dataset and the path that SMB/NFS/iSCSI
+# resources live on); attempting it in the same apply as their updates fails with
+# "[ENOENT] Path not found". Pool teardown belongs to the destroy phase.
 # =============================================================================
 
 terraform {
@@ -46,6 +52,21 @@ locals {
 }
 
 # =============================================================================
+# Pool - UNCHANGED (must mirror create/ to prevent destruction)
+# =============================================================================
+
+resource "trueform_pool" "test" {
+  name = var.pool_name
+
+  topology = [
+    {
+      type  = "data"
+      disks = var.pool_disks
+    }
+  ]
+}
+
+# =============================================================================
 # Dataset - MODIFIED
 # - Changed compression: lz4 -> gzip
 # - Changed comments
@@ -53,12 +74,14 @@ locals {
 # =============================================================================
 
 resource "trueform_dataset" "test" {
-  pool        = var.pool_name
+  pool        = trueform_pool.test.name
   name        = local.dataset_name
   comments    = "Test dataset MODIFIED by Terraform provider test suite"
   compression = "GZIP"
   atime       = "OFF"
   # Note: quota must be >= 1GB or omitted. Removed for testing.
+
+  depends_on = [trueform_pool.test]
 }
 
 # =============================================================================
@@ -229,4 +252,34 @@ resource "trueform_static_route" "test" {
   destination = var.static_route_destination
   gateway     = var.static_route_gateway
   description = "Test static route MODIFIED by Terraform provider test suite"
+}
+
+# =============================================================================
+# Docker Service - UNCHANGED (must mirror create/ to prevent destruction)
+# =============================================================================
+
+resource "trueform_service_docker" "config" {
+  pool       = trueform_pool.test.name
+  depends_on = [trueform_pool.test]
+}
+
+# =============================================================================
+# App - UNCHANGED (must mirror create/ to prevent destruction)
+# =============================================================================
+
+resource "trueform_app" "test" {
+  name        = "${var.test_prefix}-app"
+  catalog_app = var.test_app_name
+  train       = var.test_app_train
+  version     = var.test_app_version
+  values = jsonencode({
+    image = {
+      repository  = "busybox"
+      tag         = "latest"
+      pull_policy = "missing"
+    }
+    command = ["sleep", "3600"]
+  })
+
+  depends_on = [trueform_service_docker.config]
 }

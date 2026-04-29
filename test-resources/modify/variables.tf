@@ -34,6 +34,11 @@ variable "pool_name" {
   type        = string
 }
 
+variable "pool_disks" {
+  description = "List of disk identifiers used for the test pool (must match the values used in create/)"
+  type        = list(string)
+}
+
 variable "base_path" {
   description = "Base path on the pool for test resources (e.g., /mnt/POOL)"
   type        = string
@@ -66,4 +71,22 @@ variable "test_user_password" {
   type        = string
   sensitive   = true
   default     = "UpdatedPassword456!"
+}
+
+variable "test_app_name" {
+  description = "Catalog app deployed by create/ (must match)"
+  type        = string
+  default     = "ix-app"
+}
+
+variable "test_app_train" {
+  description = "Catalog train for the test app (must match create/)"
+  type        = string
+  default     = "stable"
+}
+
+variable "test_app_version" {
+  description = "Version of the test app (must match create/)"
+  type        = string
+  default     = "1.4.3"
 }
