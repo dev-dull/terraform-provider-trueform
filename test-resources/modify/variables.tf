@@ -88,5 +88,5 @@ variable "test_app_train" {
 variable "test_app_version" {
   description = "Version of the test app (must match create/)"
   type        = string
-  default     = "1.4.3"
+  default     = "1.4.4"
 }

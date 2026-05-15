@@ -84,5 +84,5 @@ variable "test_app_train" {
 variable "test_app_version" {
   description = "Version of the test app to deploy. ix-app catalog versions change with TrueNAS releases — query catalog.get_app_details if the default no longer exists."
   type        = string
-  default     = "1.4.3"
+  default     = "1.4.4"
 }

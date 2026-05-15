@@ -11,7 +11,7 @@ The Trueform provider enables Terraform to manage [TrueNAS Scale](https://www.tr
 ## Requirements
 
 - [Terraform](https://www.terraform.io/downloads.html) >= 1.0
-- [TrueNAS Scale](https://www.truenas.com/truenas-scale/) >= 25.04 (verified end-to-end against 25.10.3)
+- [TrueNAS Scale](https://www.truenas.com/truenas-scale/) >= 25.04 (verified end-to-end against 25.10.3.1)
 - A TrueNAS API key with appropriate permissions
 
 ## Import Behavior

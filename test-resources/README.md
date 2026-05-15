@@ -230,7 +230,7 @@ terraform destroy -auto-approve
 | `test_user_password` | `"TestPassword123!"` | Password for test user |
 | `test_app_name` | `"ix-app"` | Catalog app for testing |
 | `test_app_train` | `"stable"` | Catalog train for test app |
-| `test_app_version` | `"1.4.3"` | Version of test app (changes with TrueNAS releases — see Troubleshooting if `[ENOENT] Version not found`) |
+| `test_app_version` | `"1.4.4"` | Version of test app (changes with TrueNAS releases — see Troubleshooting if `[ENOENT] Version not found`) |
 
 ## Troubleshooting
 
