@@ -12,7 +12,46 @@ import (
 type Config struct {
 	Proxmox ProxmoxConfig           `json:"proxmox"`
 	Truenas TruenasConfig           `json:"truenas"`
+	Test    TestConfig              `json:"test"`
 	Targets map[string]TargetConfig `json:"targets"`
+}
+
+// TestConfig holds the non-secret parameters the terraform test cycle needs
+// (disk names, networks, etc.). The API key is never here — it comes from the
+// TRUENAS_API_KEY environment variable.
+type TestConfig struct {
+	PoolName           string   `json:"pool_name"`
+	PoolDisks          []string `json:"pool_disks"`
+	TestPrefix         string   `json:"test_prefix"`
+	BasePath           string   `json:"base_path"`
+	NFSAllowedNetwork  string   `json:"nfs_allowed_network"`
+	StaticRouteGateway string   `json:"static_route_gateway"`
+	AppVersion         string   `json:"app_version"`
+}
+
+// Validate reports whether the test section has the fields the cycle requires.
+// Called only by `e2e test`, so `status`/`reset` work without a test section.
+func (t TestConfig) Validate() error {
+	missing := []string{}
+	if t.PoolName == "" {
+		missing = append(missing, "pool_name")
+	}
+	if len(t.PoolDisks) == 0 {
+		missing = append(missing, "pool_disks")
+	}
+	if t.NFSAllowedNetwork == "" {
+		missing = append(missing, "nfs_allowed_network")
+	}
+	if t.StaticRouteGateway == "" {
+		missing = append(missing, "static_route_gateway")
+	}
+	if t.AppVersion == "" {
+		missing = append(missing, "app_version")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("config test section is missing: %v", missing)
+	}
+	return nil
 }
 
 type ProxmoxConfig struct {

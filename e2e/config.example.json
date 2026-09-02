@@ -8,6 +8,15 @@
   "truenas": {
     "host": "TRUENAS-IP"
   },
+  "test": {
+    "pool_name": "testpool",
+    "pool_disks": ["sdb", "sdc", "sdd", "sde"],
+    "test_prefix": "tftest",
+    "base_path": "/mnt/testpool",
+    "nfs_allowed_network": "192.168.0.0/24",
+    "static_route_gateway": "192.168.0.1",
+    "app_version": "1.4.4"
+  },
   "targets": {
     "tn25": { "vmid": 100, "golden": "EXACT-25-SNAPSHOT-NAME", "expected_major": 25 },
     "tn26": { "vmid": 100, "golden": "EXACT-26-SNAPSHOT-NAME", "expected_major": 26 }

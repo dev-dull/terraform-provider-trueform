@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/trueform/terraform-provider-trueform/e2e/proxmox"
+	"github.com/trueform/terraform-provider-trueform/e2e/runner"
 	"github.com/trueform/terraform-provider-trueform/e2e/truenas"
 )
 
@@ -48,6 +49,15 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "test":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: e2e test <target>")
+			os.Exit(2)
+		}
+		if err := runTest(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
 		usage()
 		os.Exit(2)
@@ -58,6 +68,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage: e2e <command>")
 	fmt.Fprintln(os.Stderr, "  status          read-only: Proxmox connectivity + per-target snapshot/VM state")
 	fmt.Fprintln(os.Stderr, "  reset <target>   DESTRUCTIVE: roll <target> back to its golden, boot, verify health")
+	fmt.Fprintln(os.Stderr, "  test <target>    DESTRUCTIVE: reset, then run the full create->import->modify->destroy cycle")
 }
 
 func target(cfg *Config, name string) (TargetConfig, error) {
@@ -81,29 +92,10 @@ func truenasAPIKey() (string, error) {
 	return key, nil
 }
 
-// runReset rolls a target back to its golden snapshot, boots the VM, and verifies
-// the guest is healthy and the expected major version. DESTRUCTIVE: it discards
-// the VM's current live state.
-func runReset(name string) error {
-	cfg, err := LoadConfig(configPath())
-	if err != nil {
-		return err
-	}
-	t, err := target(cfg, name)
-	if err != nil {
-		return err
-	}
-	pve, err := newProxmox(cfg)
-	if err != nil {
-		return err
-	}
-	apiKey, err := truenasAPIKey()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-
+// resetTarget rolls a target back to its golden snapshot, boots the VM, and
+// verifies the guest is healthy and the expected major version. DESTRUCTIVE: it
+// discards the VM's current live state.
+func resetTarget(ctx context.Context, cfg *Config, pve *proxmox.Client, t TargetConfig, name, apiKey string) error {
 	fmt.Printf("reset %s: rolling vmid %d back to golden %q (DESTRUCTIVE: discards live state)\n", name, t.VMID, t.Golden)
 	start := time.Now()
 	if err := pve.Rollback(ctx, t.VMID, t.Golden); err != nil {
@@ -125,6 +117,80 @@ func runReset(name string) error {
 	}
 	pools, _ := tn.PoolCount(ctx)
 	fmt.Printf("  healthy: major %d as expected, %d user pool(s) online\n", t.ExpectedMajor, pools)
+	return nil
+}
+
+// setup loads config, resolves the target and creds, and builds the Proxmox
+// client — the common preamble for reset and test.
+func setup(name string) (*Config, TargetConfig, *proxmox.Client, string, error) {
+	cfg, err := LoadConfig(configPath())
+	if err != nil {
+		return nil, TargetConfig{}, nil, "", err
+	}
+	t, err := target(cfg, name)
+	if err != nil {
+		return nil, TargetConfig{}, nil, "", err
+	}
+	pve, err := newProxmox(cfg)
+	if err != nil {
+		return nil, TargetConfig{}, nil, "", err
+	}
+	apiKey, err := truenasAPIKey()
+	if err != nil {
+		return nil, TargetConfig{}, nil, "", err
+	}
+	return cfg, t, pve, apiKey, nil
+}
+
+func runReset(name string) error {
+	cfg, t, pve, apiKey, err := setup(name)
+	if err != nil {
+		return err
+	}
+	return resetTarget(context.Background(), cfg, pve, t, name, apiKey)
+}
+
+// runTest resets the target to a clean golden, then runs the full terraform
+// create->import->modify->destroy cycle against it. DESTRUCTIVE.
+func runTest(name string) error {
+	cfg, t, pve, apiKey, err := setup(name)
+	if err != nil {
+		return err
+	}
+	if err := cfg.Test.Validate(); err != nil {
+		return err
+	}
+	root, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	if err := resetTarget(ctx, cfg, pve, t, name, apiKey); err != nil {
+		return err
+	}
+
+	fmt.Printf("test %s: create -> import -> modify -> destroy\n", name)
+	rn, err := runner.New(root, runner.Params{
+		TruenasHost:        cfg.Truenas.Host,
+		TruenasAPIKey:      apiKey,
+		PoolName:           cfg.Test.PoolName,
+		PoolDisks:          cfg.Test.PoolDisks,
+		TestPrefix:         cfg.Test.TestPrefix,
+		BasePath:           cfg.Test.BasePath,
+		NFSAllowedNetwork:  cfg.Test.NFSAllowedNetwork,
+		StaticRouteGateway: cfg.Test.StaticRouteGateway,
+		AppVersion:         cfg.Test.AppVersion,
+	})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rn.Close() }()
+
+	if err := rn.RunCycle(ctx); err != nil {
+		return fmt.Errorf("FAIL: %w", err)
+	}
+	fmt.Printf("test %s: PASS\n", name)
 	return nil
 }
 
