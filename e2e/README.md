@@ -75,10 +75,11 @@ Then repeat for **26** (`tn26`); it reverts to the 26 golden independently — t
 
 ### Snapshot-tree housekeeping
 
-Goldens form a **branching tree** on the one VM (the 26 golden is a child of the 25
-golden). Proxmox **cannot rename a snapshot, and cannot delete one that still has
-children**, so each refresh adds a snapshot and old goldens cannot be pruned while
-they are ancestors of newer ones. The chain — and its disk usage — grows over time;
+Goldens form a **branching tree** on the one VM — each refresh branches from the
+golden you reverted to (the 26 golden is already a child of the 25 golden). Proxmox
+**cannot rename a snapshot, and cannot delete one that still has children**, so each
+refresh adds a snapshot and old goldens cannot be pruned while they are ancestors of
+newer ones. The chain — and its disk usage — grows over time;
 periodically re-baseline from a fresh clean-install lineage to keep it bounded.
 
 ### Automated vs manual (today)

@@ -122,10 +122,8 @@ a golden and test the provider against the update, per version:
 Repeat for each version. The versions are independent — refreshing the 25 golden
 does not affect the 26 golden.
 
-**Housekeeping:** snapshots form a branching tree, and Proxmox cannot rename a
-snapshot or delete one that still has children, so goldens accumulate and the chain
-grows over disk. Periodically re-baseline from a fresh `clean-install` lineage to
-keep it bounded.
-
-> Maintainers automate this loop (revert → boot → the full cycle) with a private
-> Proxmox-driven harness; the manual steps above are the reference process.
+**Housekeeping:** snapshots form a branching tree — each refresh branches from the
+golden you reverted to, so the 25 and 26 lines diverge from their common ancestor —
+and Proxmox cannot rename a snapshot or delete one that still has children. Goldens
+therefore accumulate and the chain grows over disk; periodically re-baseline from a
+fresh `clean-install` lineage to keep it bounded.
