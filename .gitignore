@@ -17,3 +17,9 @@ terraform-provider-trueform
 # GPG keys
 *.asc
 *.gpg
+
+# e2e harness (homelab test tooling — code is tracked, real config/secrets/state are not)
+e2e/config.json
+e2e/*.log
+e2e/**/*.tfstate*
+e2e/**/.terraform*
