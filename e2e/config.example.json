@@ -5,6 +5,9 @@
     "token_id": "user@pve!tokenname",
     "verify_tls": false
   },
+  "truenas": {
+    "host": "TRUENAS-IP"
+  },
   "targets": {
     "tn25": { "vmid": 100, "golden": "EXACT-25-SNAPSHOT-NAME", "expected_major": 25 },
     "tn26": { "vmid": 100, "golden": "EXACT-26-SNAPSHOT-NAME", "expected_major": 26 }

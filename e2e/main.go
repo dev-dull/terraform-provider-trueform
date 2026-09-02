@@ -12,6 +12,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -19,7 +20,11 @@ import (
 	"time"
 
 	"github.com/trueform/terraform-provider-trueform/e2e/proxmox"
+	"github.com/trueform/terraform-provider-trueform/e2e/truenas"
 )
+
+// bootTimeout bounds how long we wait for TrueNAS to answer after a rollback+start.
+const bootTimeout = 6 * time.Minute
 
 const defaultConfigPath = "e2e/config.json"
 
@@ -34,6 +39,15 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "reset":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: e2e reset <target>")
+			os.Exit(2)
+		}
+		if err := runReset(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
 		usage()
 		os.Exit(2)
@@ -42,7 +56,76 @@ func main() {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: e2e <command>")
-	fmt.Fprintln(os.Stderr, "  status   read-only: Proxmox connectivity + per-target snapshot/VM state")
+	fmt.Fprintln(os.Stderr, "  status          read-only: Proxmox connectivity + per-target snapshot/VM state")
+	fmt.Fprintln(os.Stderr, "  reset <target>   DESTRUCTIVE: roll <target> back to its golden, boot, verify health")
+}
+
+func target(cfg *Config, name string) (TargetConfig, error) {
+	t, ok := cfg.Targets[name]
+	if !ok {
+		names := make([]string, 0, len(cfg.Targets))
+		for n := range cfg.Targets {
+			names = append(names, n)
+		}
+		sort.Strings(names)
+		return TargetConfig{}, fmt.Errorf("unknown target %q (configured: %v)", name, names)
+	}
+	return t, nil
+}
+
+func truenasAPIKey() (string, error) {
+	key := os.Getenv("TRUENAS_API_KEY")
+	if key == "" {
+		return "", fmt.Errorf("TRUENAS_API_KEY is empty; export the TrueNAS API key (e.g. from test-resources/creds or 1Password)")
+	}
+	return key, nil
+}
+
+// runReset rolls a target back to its golden snapshot, boots the VM, and verifies
+// the guest is healthy and the expected major version. DESTRUCTIVE: it discards
+// the VM's current live state.
+func runReset(name string) error {
+	cfg, err := LoadConfig(configPath())
+	if err != nil {
+		return err
+	}
+	t, err := target(cfg, name)
+	if err != nil {
+		return err
+	}
+	pve, err := newProxmox(cfg)
+	if err != nil {
+		return err
+	}
+	apiKey, err := truenasAPIKey()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	fmt.Printf("reset %s: rolling vmid %d back to golden %q (DESTRUCTIVE: discards live state)\n", name, t.VMID, t.Golden)
+	start := time.Now()
+	if err := pve.Rollback(ctx, t.VMID, t.Golden); err != nil {
+		return fmt.Errorf("rollback: %w", err)
+	}
+	fmt.Printf("  rollback complete (%s); waiting for TrueNAS to boot...\n", time.Since(start).Round(time.Second))
+
+	tn, err := truenas.WaitForReady(ctx, cfg.Truenas.Host, apiKey, bootTimeout)
+	if err != nil {
+		return err
+	}
+	defer tn.Close()
+
+	ver, _ := tn.Version(ctx)
+	fmt.Printf("  ready (%s): %s (major %d)\n", time.Since(start).Round(time.Second), ver, tn.MajorVersion())
+
+	if err := tn.HealthCheck(ctx, t.ExpectedMajor); err != nil {
+		return fmt.Errorf("health check: %w", err)
+	}
+	pools, _ := tn.PoolCount(ctx)
+	fmt.Printf("  healthy: major %d as expected, %d user pool(s) online\n", t.ExpectedMajor, pools)
+	return nil
 }
 
 func configPath() string {

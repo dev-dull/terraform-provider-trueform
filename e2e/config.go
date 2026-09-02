@@ -11,6 +11,7 @@ import (
 // (PROXMOX_TOKEN_SECRET), never from this file.
 type Config struct {
 	Proxmox ProxmoxConfig           `json:"proxmox"`
+	Truenas TruenasConfig           `json:"truenas"`
 	Targets map[string]TargetConfig `json:"targets"`
 }
 
@@ -19,6 +20,13 @@ type ProxmoxConfig struct {
 	Node      string `json:"node"`
 	TokenID   string `json:"token_id"`
 	VerifyTLS bool   `json:"verify_tls"`
+}
+
+// TruenasConfig is the guest's connection info. It is the same VM across both
+// targets (one IP, one API key that persists across rollbacks). The API key is
+// NOT stored here — it comes from the TRUENAS_API_KEY environment variable.
+type TruenasConfig struct {
+	Host string `json:"host"`
 }
 
 type TargetConfig struct {
@@ -38,6 +46,9 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if c.Proxmox.APIURL == "" || c.Proxmox.Node == "" || c.Proxmox.TokenID == "" {
 		return nil, fmt.Errorf("%s: proxmox.api_url, node, and token_id are required", path)
+	}
+	if c.Truenas.Host == "" {
+		return nil, fmt.Errorf("%s: truenas.host is required", path)
 	}
 	if len(c.Targets) == 0 {
 		return nil, fmt.Errorf("%s: at least one target is required", path)
