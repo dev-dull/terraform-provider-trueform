@@ -120,6 +120,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	// Connect
 	conn, _, err := dialer.DialContext(connectCtx, u.String(), http.Header{})
 	if err != nil {
+		c.connMu.Unlock()
 		return NewConnectionError(c.host, err)
 	}
 
