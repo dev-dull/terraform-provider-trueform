@@ -95,6 +95,22 @@ func LoadConfig(path string) (*Config, error) {
 	return &c, nil
 }
 
+// SetGolden repoints a target's golden snapshot name and writes the config back
+// to path. Config is machine-managed and gitignored, so a marshal-rewrite is fine.
+func (c *Config) SetGolden(path, target, snapshot string) error {
+	t, ok := c.Targets[target]
+	if !ok {
+		return fmt.Errorf("unknown target %q", target)
+	}
+	t.Golden = snapshot
+	c.Targets[target] = t
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(b, '\n'), 0o600)
+}
+
 // AllowedVMIDs returns the unique vmids across all targets, for the Proxmox
 // client's safety allowlist.
 func (c *Config) AllowedVMIDs() []int {

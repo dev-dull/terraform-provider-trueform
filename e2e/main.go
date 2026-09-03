@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -26,6 +27,9 @@ import (
 
 // bootTimeout bounds how long we wait for TrueNAS to answer after a rollback+start.
 const bootTimeout = 6 * time.Minute
+
+// updateTimeout bounds an update.run: download (~GBs) + install + reboot.
+const updateTimeout = 40 * time.Minute
 
 const defaultConfigPath = "e2e/config.json"
 
@@ -58,6 +62,24 @@ func main() {
 			fmt.Fprintln(os.Stderr, "error:", err)
 			os.Exit(1)
 		}
+	case "check-updates":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: e2e check-updates <target>")
+			os.Exit(2)
+		}
+		if err := runCheckUpdates(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
+	case "refresh":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "usage: e2e refresh <target>")
+			os.Exit(2)
+		}
+		if err := runRefresh(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "error:", err)
+			os.Exit(1)
+		}
 	default:
 		usage()
 		os.Exit(2)
@@ -69,6 +91,15 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  status          read-only: Proxmox connectivity + per-target snapshot/VM state")
 	fmt.Fprintln(os.Stderr, "  reset <target>   DESTRUCTIVE: roll <target> back to its golden, boot, verify health")
 	fmt.Fprintln(os.Stderr, "  test <target>    DESTRUCTIVE: reset, then run the full create->import->modify->destroy cycle")
+	fmt.Fprintln(os.Stderr, "  check-updates <target>  DESTRUCTIVE: reset, then report whether a TrueNAS update is available")
+	fmt.Fprintln(os.Stderr, "  refresh <target>  DESTRUCTIVE: reset, apply any TrueNAS update, snapshot a new golden, repoint config")
+}
+
+// goldenName derives a Proxmox snapshot name from a version, matching the existing
+// convention (e.g. "25.10.7" -> "Updated_to_25_10_7", "26.0.0-BETA.3" ->
+// "Updated_to_26_0_0_BETA_3").
+func goldenName(version string) string {
+	return "Updated_to_" + strings.NewReplacer(".", "_", "-", "_").Replace(version)
 }
 
 func target(cfg *Config, name string) (TargetConfig, error) {
@@ -191,6 +222,94 @@ func runTest(name string) error {
 		return fmt.Errorf("FAIL: %w", err)
 	}
 	fmt.Printf("test %s: PASS\n", name)
+	return nil
+}
+
+// runCheckUpdates resets the target to its golden and reports whether a TrueNAS
+// update is available on that line. DESTRUCTIVE (the reset discards live state).
+func runCheckUpdates(name string) error {
+	cfg, t, pve, apiKey, err := setup(name)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	if err := resetTarget(ctx, cfg, pve, t, name, apiKey); err != nil {
+		return err
+	}
+	tn, err := truenas.WaitForReady(ctx, cfg.Truenas.Host, apiKey, bootTimeout)
+	if err != nil {
+		return err
+	}
+	defer tn.Close()
+	info, err := tn.CheckUpdate(ctx)
+	if err != nil {
+		return fmt.Errorf("update.status: %w", err)
+	}
+	if info.Available {
+		fmt.Printf("check-updates %s: UPDATE AVAILABLE -> %s (train %s)\n", name, info.NewVersion, info.CurrentTrain)
+	} else {
+		fmt.Printf("check-updates %s: up to date (train %s)\n", name, info.CurrentTrain)
+	}
+	return nil
+}
+
+// runRefresh resets the target to its golden, applies any available TrueNAS update
+// (which reboots), snapshots a new golden, and repoints the config to it.
+// DESTRUCTIVE, and slow (an update is a multi-GB download + install + reboot).
+func runRefresh(name string) error {
+	cfg, t, pve, apiKey, err := setup(name)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+
+	if err := resetTarget(ctx, cfg, pve, t, name, apiKey); err != nil {
+		return err
+	}
+
+	tn, err := truenas.WaitForReady(ctx, cfg.Truenas.Host, apiKey, bootTimeout)
+	if err != nil {
+		return err
+	}
+	info, err := tn.CheckUpdate(ctx)
+	if err != nil {
+		_ = tn.Close()
+		return fmt.Errorf("update.status: %w", err)
+	}
+	if !info.Available {
+		_ = tn.Close()
+		fmt.Printf("refresh %s: already up to date (train %s); golden unchanged\n", name, info.CurrentTrain)
+		return nil
+	}
+
+	fmt.Printf("refresh %s: applying update -> %s (downloads + installs + reboots; up to %s)...\n", name, info.NewVersion, updateTimeout)
+	if err := tn.ApplyUpdate(ctx); err != nil {
+		_ = tn.Close()
+		return fmt.Errorf("update.run: %w", err)
+	}
+	_ = tn.Close()
+
+	start := time.Now()
+	tn2, err := truenas.WaitForVersion(ctx, cfg.Truenas.Host, apiKey, info.NewVersion, updateTimeout)
+	if err != nil {
+		return err
+	}
+	defer tn2.Close()
+	ver, _ := tn2.Version(ctx)
+	fmt.Printf("  updated (%s): %s\n", time.Since(start).Round(time.Second), ver)
+	if err := tn2.HealthCheck(ctx, t.ExpectedMajor); err != nil {
+		return fmt.Errorf("post-update health: %w", err)
+	}
+
+	snap := goldenName(info.NewVersion)
+	fmt.Printf("  snapshotting new golden %q...\n", snap)
+	if err := pve.CreateSnapshot(ctx, t.VMID, snap, "auto: updated to "+info.NewVersion); err != nil {
+		return fmt.Errorf("create snapshot: %w", err)
+	}
+	if err := cfg.SetGolden(configPath(), name, snap); err != nil {
+		return fmt.Errorf("repoint golden in config: %w", err)
+	}
+	fmt.Printf("refresh %s: DONE — new golden %q, config repointed\n", name, snap)
 	return nil
 }
 

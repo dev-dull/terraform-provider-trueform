@@ -181,6 +181,24 @@ func (c *Client) Rollback(ctx context.Context, vmid int, snapshot string) error 
 	return c.waitTask(ctx, upid)
 }
 
+// CreateSnapshot takes a new snapshot of the VM (guarded by the allowlist) and
+// blocks until the task completes. Disk-only (no vmstate), matching the goldens.
+func (c *Client) CreateSnapshot(ctx context.Context, vmid int, name, description string) error {
+	if err := c.guard(vmid); err != nil {
+		return err
+	}
+	form := url.Values{"snapname": {name}}
+	if description != "" {
+		form.Set("description", description)
+	}
+	var upid string
+	path := fmt.Sprintf("/api2/json/nodes/%s/qemu/%d/snapshot", c.node, vmid)
+	if err := c.do(http.MethodPost, path, form, &upid); err != nil {
+		return fmt.Errorf("create snapshot: %w", err)
+	}
+	return c.waitTask(ctx, upid)
+}
+
 // waitTask polls a Proxmox task (UPID) until it stops, returning an error unless
 // it exited "OK".
 func (c *Client) waitTask(ctx context.Context, upid string) error {

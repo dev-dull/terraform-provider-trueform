@@ -39,6 +39,8 @@ errors with a clear message — unlock the app and retry. For unattended/CI use 
 - `e2e status` — read-only: Proxmox connectivity + per-target snapshot/VM state.
 - `e2e reset <target>` — **DESTRUCTIVE**: roll the target back to its golden snapshot, boot, and verify health (major version + pools online). Leaves the VM in a known-good state.
 - `e2e test <target>` — **DESTRUCTIVE**: `reset`, then run the full create → import → modify → destroy cycle and assert the invariants (create succeeds, the post-import plan is clean, destroy empties the state). Requires `TRUENAS_API_KEY` and the `test` section of `config.json`.
+- `e2e check-updates <target>` — **DESTRUCTIVE**: `reset`, then report whether a TrueNAS update is available on that line (via `update.status`).
+- `e2e refresh <target>` — **DESTRUCTIVE**: `reset`, apply any available TrueNAS update (`update.run`, which downloads + installs + reboots), health-check the new version, snapshot a new golden (`Updated_to_<version>`), and repoint `targets.<target>.golden` in `config.json`. No-op if already current.
 
 `<target>` is a key under `targets` in the config (e.g. `tn25`, `tn26`).
 
@@ -54,24 +56,25 @@ the provider cycle. Do the two versions sequentially (there is one VM).
 
 ### Per version (25 first, then 26)
 
-1. **Revert to the current golden** — `e2e reset tn25` (or the Proxmox UI).
-2. **Run TrueNAS updates** and let it reboot. Manual today. For **26** this is a
-   BETA/RC/GA step and is a **human** decision until 26.0 GA.
-3. **Take a fresh snapshot** of the updated VM — a new, *unique* name (snapshots
-   **cannot be renamed**), e.g. `Updated_to_25_10_5`, with a description. This is the
-   new golden.
-4. **Repoint the golden** — set `targets.tn25.golden` in `config.json` to the new
-   snapshot name. Until you do, `e2e test` still uses the *old* golden.
-5. **Test the provider** — `e2e test tn25` runs the full create → import → modify →
-   destroy cycle against the new golden.
+For each line it is two commands:
+
+1. **`e2e refresh tn25`** — reverts to the current golden, applies any available
+   TrueNAS update (reboots), health-checks the new version, snapshots a new golden
+   (`Updated_to_<version>`), and repoints `targets.tn25.golden` in `config.json`. If
+   the line is already current it is a no-op and the golden is unchanged.
+2. **`e2e test tn25`** — runs the full create → import → modify → destroy cycle
+   against the (now current) golden.
 
 `e2e test` begins by reverting to the golden and booting it (with a quick
-version/pools sanity check), so that step also confirms the new golden is usable —
-no separate verification needed. A cycle failure tied to a changed TrueNAS API shape
-is the signal that the provider needs updating for that version.
+version/pools sanity check), so that step also confirms the golden is usable — no
+separate verification needed. A cycle failure tied to a changed TrueNAS API shape is
+the signal that the provider needs updating for that version.
 
-Then repeat for **26** (`tn26`); it reverts to the 26 golden independently — the
-25-line work does not affect it.
+Then repeat for **26** (`e2e refresh tn26` / `e2e test tn26`); it reverts to the 26
+golden independently — the 25-line work does not affect it. **26 updates are a
+BETA/RC/GA step**: `refresh` will apply whatever the beta train offers, so run it on
+26 only when you intend to move the beta golden forward (a human decision until 26.0
+GA).
 
 ### Snapshot-tree housekeeping
 
@@ -82,10 +85,13 @@ refresh adds a snapshot and old goldens cannot be pruned while they are ancestor
 newer ones. The chain — and its disk usage — grows over time;
 periodically re-baseline from a fresh clean-install lineage to keep it bounded.
 
-### Automated vs manual (today)
+### What's automated
 
-- **Automated:** revert + boot (`e2e reset`), and the full test cycle (`e2e test`).
-- **Manual:** running the TrueNAS update, taking the snapshot, and repointing the
-  golden in `config.json`. A future `e2e refresh <target>` would fold these in —
-  apply minor-within-train updates, snapshot, and repoint the golden **only on a
-  green cycle** — with beta/major updates left to a human.
+`refresh` and `test` together automate the whole loop: revert, apply update, health-
+check, snapshot the new golden, repoint config, and run the provider cycle. The
+remaining human decisions are *when* to run `refresh` on the 26 (beta) line, and
+periodic re-baselining of the snapshot tree.
+
+`refresh` blesses a new golden on **TrueNAS health** after the update (it does not
+gate on the provider `test`): a `test` failure after an update usually means the
+provider needs work for the new version, not that the golden is bad.
