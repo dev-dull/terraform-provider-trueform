@@ -7,9 +7,13 @@ description: |-
 
 <!--
 Maintainer note: written from a code reading of truenas/terraform-provider-truenas
-v1.5.11 (commit 9311a47, 2026-10-06) and cross-checked section by section against
-that source. Not yet exercised end to end; statements tagged VERIFY still need a
-live run in the e2e harness.
+v1.5.11 (commit 9311a47, 2026-10-06), then exercised end to end on 2026-10-10 against
+TrueNAS 26.0.0-BETA.3 with Terraform 1.14.8: pool, dataset, snapshot, SMB, NFS, user,
+cronjob, static route, docker config, app, certificate and all five iSCSI resources
+migrated with "16 to import, 0 to add, 0 to destroy" and a clean plan afterwards.
+The replacement traps, the SMB purpose fallback and the rule 3 overwrite were
+reproduced live. vm and vm_device were not tested (no nested virtualization), and
+statements still tagged VERIFY were not exercised.
 -->
 
 # Migrating to the official TrueNAS provider
@@ -47,7 +51,7 @@ Keep **both** providers declared and configured until the migration apply comple
 terraform {
   required_providers {
     trueform = {
-      source = "trueform/trueform"
+      source = "dev-dull/trueform" # your existing trueform entry, unchanged
     }
     truenas = {
       source  = "truenas/truenas"
@@ -114,7 +118,7 @@ Rename each `trueform_*` block to its `truenas_*` equivalent, **in place under t
 
 1. **Leave out attributes you don't manage.** Most official attributes are *Optional + Computed* and keep their imported value when you omit them. Omitting is always safe; setting an attribute means its value must match the NAS exactly.
 2. **Never set an attribute that can't be read back and forces replacement.** These are null after import, so any value in config forces a replace. Each one is called out below, with an `ignore_changes` workaround where the attribute is required.
-3. **Set explicitly the attributes that the official SMB, user and iSCSI resources always send.** On these resources, an unset attribute can go *(known after apply)* when something else changes, and then goes out as `false` / `""` / `[]`. <!-- VERIFY: unknown→zero-value overwrite on smb/user/iscsi_target groups --> The per-resource notes list which ones.
+3. **Set explicitly the attributes that the official SMB, user and iSCSI resources always send.** On these resources, an unset attribute imports cleanly and plans *No changes*, but as soon as something else on the resource changes it goes *(known after apply)* and is sent as `false` / `""` / `[]`. In testing, changing only an SMB share's `comment` also turned `browsable` off, and changing only a user's `email` removed the user from all its groups. The per-resource notes list which attributes to set. <!-- VERIFY: iscsi_target groups (alias was not affected) -->
 
 References between resources keep working, because the block names stay the same: `truenas_iscsi_target.storage.id` replaces `trueform_iscsi_target.storage.id`.
 
@@ -187,7 +191,7 @@ resource "truenas_pool" "tank" {
 | `quota_warning`, `quota_critical`, `casesensitivity`, `managed_by` | none |
 | — | `exec`, `sync`, `xattr`, `special_small_block_size`, native encryption |
 
-!> **Remove `type`, `acltype` and `share_type`** from dataset blocks. All three force replacement, and a replace deletes the dataset *recursively*. `share_type` is never read back, and `type`/`acltype` are read back in lowercase. If you must keep `type` or `acltype`, write it in lowercase (`"filesystem"`, `"posix"`). <!-- VERIFY: uppercase type in config vs lowercase state plans a replace -->
+!> **Remove `type`, `acltype` and `share_type`** from dataset blocks. All three force replacement, and a replace deletes the dataset *recursively*. `share_type` is never read back, and `type`/`acltype` are read back in lowercase. If you must keep `type` or `acltype`, copy the exact lowercase value from `terraform state show` (for example `"filesystem"`, `"inherit"`, `"posix"`).
 
 Nested datasets become a plain full path: `name = "tank/media/movies"`. Use `truenas_dataset.media.mountpoint` rather than hard-coding `/mnt/...` in share paths.
 
@@ -224,7 +228,7 @@ resource "truenas_snapshot" "pre_upgrade" {
 | `hostsallow`, `hostsdeny` | `options = { hostsallow = [...], hostsdeny = [...] }` |
 | `home`, `timemachine`, `recyclebin`, `guestok`, `acl`, `durablehandle`, `streams` | only honoured when `purpose = "LEGACY_SHARE"` |
 
-**Always set `purpose`.** trueform created `DEFAULT_SHARE` shares. If `purpose` is unset, the official provider sends `LEGACY_SHARE` on the next update. Also set `enabled`, `browsable`, `ro`, `abe` and `comment` explicitly ([rule 3](#step-3-rewrite-each-resource)). Check `terraform state show` after import to see which `purpose` and `options` your share actually has.
+**Always set `purpose`.** trueform created `DEFAULT_SHARE` shares. If `purpose` is unset, the import plans cleanly, but the next update converts the share to `LEGACY_SHARE`. The conversion happens on the NAS even though Terraform then reports *Provider produced inconsistent result after apply*. Also set `enabled`, `browsable`, `ro`, `abe` and `comment` explicitly ([rule 3](#step-3-rewrite-each-resource)). Check `terraform state show` after import to see which `purpose` and `options` your share actually has.
 
 ```hcl
 resource "truenas_smb_share" "media" {
@@ -256,6 +260,8 @@ This is the easiest migration. `path` now forces replacement, `aliases` is gone,
 | — | `ssh_password_enabled`, `webshare` (26+), `immutable`, `local` |
 
 `uid` forces replacement: omit it, or match it exactly. trueform's defaults (`home = "/var/empty"`, `shell = "/usr/bin/zsh"`, `smb = true`) no longer apply, so write the values you rely on, along with `full_name`, `email`, `locked`, `password_disabled`, `sshpubkey` and `groups` ([rule 3](#step-3-rewrite-each-resource)).
+
+!> **Copy `groups` from `terraform state show` after import**, even if you never set it in trueform. TrueNAS adds every new user to a built-in group (it was `groups = [91]` on a test system), and the first update of a user with `groups` unset removes the user from it. Leaving `full_name` unset makes that update fail outright (`full_name: String should have at least 1 character`).
 
 ### vm
 
@@ -293,7 +299,7 @@ resource "truenas_vm_device" "disk" {
 <a id="app"></a>
 ### app
 
-!> **`catalog_app` forces replacement after import**: it is never read back. A replace deletes and redeploys the app. Remove the attribute, or add `ignore_changes = [catalog_app]`.
+!> **`catalog_app` forces replacement after import**: it is never read back. A replace deletes and redeploys the app. Remove the attribute (simplest; the plan is then clean), or keep it and add `ignore_changes = [catalog_app]`.
 
 Pin `version` to the version currently installed (changing it runs an upgrade), and leave `running` unset. `metadata` is gone; `human_version` and `upgrade_available` are new.
 
@@ -305,10 +311,7 @@ resource "truenas_app" "nginx" {
   train   = "stable"
   version = "1.4.3"
   values  = jsonencode({ image = { repository = "nginx", tag = "latest" } })
-
-  lifecycle {
-    ignore_changes = [catalog_app]
-  }
+  # catalog_app omitted on purpose: see the warning above
 }
 ```
 

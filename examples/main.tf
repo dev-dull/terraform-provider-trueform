@@ -10,7 +10,7 @@
 terraform {
   required_providers {
     trueform = {
-      source = "registry.terraform.io/trueform/trueform"
+      source = "dev-dull/trueform"
     }
   }
 }

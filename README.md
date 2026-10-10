@@ -30,8 +30,8 @@ The name TrueForm is taking "form" from Terraform, and "true" from TrueNAS.
 ### Building from Source
 
 ```bash
-git clone https://github.com/trueform/terraform-provider-trueform.git
-cd trueform
+git clone https://github.com/dev-dull/terraform-provider-trueform.git
+cd terraform-provider-trueform
 go build -o terraform-provider-trueform
 ```
 
@@ -40,8 +40,8 @@ go build -o terraform-provider-trueform
 After building, move the binary to your Terraform plugins directory:
 
 ```bash
-mkdir -p ~/.terraform.d/plugins/registry.terraform.io/trueform/trueform/0.1.0/darwin_arm64/
-mv terraform-provider-trueform ~/.terraform.d/plugins/registry.terraform.io/trueform/trueform/0.1.0/darwin_arm64/
+mkdir -p ~/.terraform.d/plugins/registry.terraform.io/dev-dull/trueform/0.1.0/darwin_arm64/
+mv terraform-provider-trueform ~/.terraform.d/plugins/registry.terraform.io/dev-dull/trueform/0.1.0/darwin_arm64/
 ```
 
 Adjust the path for your OS/architecture (e.g., `linux_amd64`, `darwin_amd64`).
@@ -62,7 +62,7 @@ The provider uses API key authentication. To create an API key in TrueNAS:
 terraform {
   required_providers {
     trueform = {
-      source = "registry.terraform.io/trueform/trueform"
+      source = "dev-dull/trueform"
     }
   }
 }
