@@ -1,14 +1,14 @@
 ---
 page_title: "Trueform Provider"
 description: |-
-  The Trueform provider enables Terraform to manage TrueNAS Scale resources.
+  Deprecated and no longer maintained. Use the official truenas/truenas provider instead.
 ---
 
 <img src="https://raw.githubusercontent.com/dev-dull/terraform-provider-trueform/main/logo.svg" alt="Trueform" width="400">
 
 The Trueform provider enables Terraform to manage [TrueNAS Scale](https://www.truenas.com/truenas-scale/) resources using the WebSocket JSON-RPC API. It supports **TrueNAS Scale 25.04+ and TrueNAS 26** (currently in beta), detecting the server version at runtime and using the correct API for each.
 
-~> **Trueform will be deprecated soon.** iXsystems now publishes an official provider, [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas), which covers everything Trueform does and much more. New projects should start there. Existing users can move their configuration and state without recreating anything on the NAS by following the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider).
+!> **Trueform is deprecated and no longer maintained.** There will be no further releases or fixes. iXsystems publishes an official provider, [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas), which covers everything Trueform does and much more. Use it for new projects. Existing users can move their configuration and state without recreating anything on the NAS by following the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider).
 
 ## Requirements
 

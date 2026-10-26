@@ -7,6 +7,8 @@ description: |-
 
 # trueform_app (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages an application on TrueNAS Scale. Apps are deployed from the TrueNAS app catalog.
 
 ~> **Note:** Changing the `name` or `catalog_app` will force recreation of the application.

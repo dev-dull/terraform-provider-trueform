@@ -7,6 +7,8 @@ description: |-
 
 # trueform_snapshot (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages a ZFS snapshot on TrueNAS Scale. Snapshots provide point-in-time copies of datasets for backup and recovery.
 
 ~> **Note:** Snapshots are immutable. Changing the `name` or `dataset` will force recreation of the snapshot.

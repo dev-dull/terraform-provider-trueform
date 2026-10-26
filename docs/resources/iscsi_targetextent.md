@@ -7,6 +7,8 @@ description: |-
 
 # trueform_iscsi_targetextent (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages an iSCSI target-extent mapping on TrueNAS Scale. This resource connects an extent (LUN) to a target, making the storage accessible to initiators.
 
 ## Example Usage

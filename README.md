@@ -6,10 +6,11 @@
 
 A Terraform provider for managing TrueNAS Scale 25.04+ and TrueNAS 26 (beta) resources.
 
-> [!WARNING]
-> **TrueForm will be deprecated soon.** iXsystems now publishes an official provider,
+> [!CAUTION]
+> **TrueForm is deprecated, and this repository is archived.** There will be no further
+> releases, fixes or support. iXsystems publishes an official provider,
 > [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas), which covers
-> everything TrueForm does and much more. New projects should start there. Existing users
+> everything TrueForm does and much more. Use it for new projects. Existing users
 > can move their configuration and state without recreating anything on the NAS by following
 > the [migration guide](docs/guides/migrating-to-truenas-provider.md).
 
@@ -238,7 +239,7 @@ This provider communicates with TrueNAS using the WebSocket JSON-RPC 2.0 API int
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+This repository is archived and no longer accepts issues or pull requests. Please take TrueNAS provider issues and contributions to [`truenas/terraform-provider-truenas`](https://github.com/truenas/terraform-provider-truenas).
 
 ## License
 

@@ -1,5 +1,8 @@
 # Contributing
 
+> [!CAUTION]
+> TrueForm is deprecated and this repository is archived, so it no longer accepts contributions. The notes below are kept for reference. Please contribute to the official provider, [`truenas/terraform-provider-truenas`](https://github.com/truenas/terraform-provider-truenas), instead.
+
 ## Test VM Setup (Proxmox)
 
 The integration tests in `test-resources/` require a TrueNAS SCALE VM with disposable disks. This guide covers setting up the test VM on Proxmox VE, taking a clean snapshot, and the snapshot-revert workflow for repeatable test runs.

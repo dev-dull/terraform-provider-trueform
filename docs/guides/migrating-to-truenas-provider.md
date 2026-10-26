@@ -18,7 +18,7 @@ statements still tagged VERIFY were not exercised.
 
 # Migrating to the official TrueNAS provider
 
-iXsystems now publishes an official provider, [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas). It covers everything trueform does and much more: 85 resources, including zvols, groups, periodic snapshot tasks, replication, services and ACLs. It is the better long-term home for your configuration, and this guide moves you onto it **without destroying or recreating anything on the NAS**.
+Trueform is deprecated and no longer maintained. iXsystems publishes an official provider, [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas). It covers everything trueform does and much more: 85 resources, including zvols, groups, periodic snapshot tasks, replication, services and ACLs. It is the better long-term home for your configuration, and this guide moves you onto it **without destroying or recreating anything on the NAS**.
 
 ## How the migration works
 

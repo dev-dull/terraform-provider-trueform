@@ -7,6 +7,8 @@ description: |-
 
 # trueform_pool (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages a ZFS storage pool on TrueNAS Scale. Pools are the top-level storage containers in ZFS.
 
 ~> **Warning:** Destroying a pool will permanently delete all data stored in it. This action cannot be undone.

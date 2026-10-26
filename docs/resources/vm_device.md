@@ -7,6 +7,8 @@ description: |-
 
 # trueform_vm_device (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages a virtual machine device on TrueNAS Scale. Devices include disks, NICs, CD-ROMs, and PCI passthrough.
 
 ## Example Usage

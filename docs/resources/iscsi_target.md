@@ -7,6 +7,8 @@ description: |-
 
 # trueform_iscsi_target (Resource)
 
+!> **Deprecated.** Trueform is no longer maintained. Use the official [`truenas/truenas`](https://registry.terraform.io/providers/truenas/truenas) provider; the [migration guide](https://registry.terraform.io/providers/dev-dull/trueform/latest/docs/guides/migrating-to-truenas-provider) moves existing state without recreating anything.
+
 Manages an iSCSI target on TrueNAS Scale. Targets are the named endpoints that initiators connect to.
 
 ## Example Usage
